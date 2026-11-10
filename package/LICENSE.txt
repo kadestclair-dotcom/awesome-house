@@ -1,0 +1,46 @@
+Awesome House - License
+=======================
+Version: Beta 0.14
+Copyright (c) 2026 Kade. All rights reserved.
+
+This app is free to use. By installing or using it, you agree to these terms.
+
+YOU MAY
+  - Download, install and use the app for your own personal, non-commercial use.
+  - Use it while it is in beta, knowing that beta software can have bugs and
+    can change between versions.
+  - Tell other people about it and point them to the official download page:
+    github.com/kadestclair-dotcom/awesome-house/releases
+
+YOU MAY NOT, without Kade's written permission
+  - Redistribute, re-upload, mirror or share copies of the app or this package.
+  - Sell, rent or charge for the app, or bundle it with anything that is sold.
+  - Modify, decompile, reverse-engineer, rebrand or make derivative works of it.
+  - Remove or change this notice or any copyright notice in the app.
+
+DONATIONS
+  Donations are voluntary and appreciated. A donation does not buy any license,
+  feature, priority support or other right, and nothing in the app is locked
+  behind a donation.
+
+NO WARRANTY
+  The app is provided "as is", without warranty of any kind. Prices, upgrade
+  scores and other results are estimates. Kade is not liable for any loss,
+  including lost in-game gold, items or time, or any action taken on your
+  account, arising from use of the app.
+
+THIRD PARTIES
+  - The app uses Blizzard's Developer API with your own API client. Your use of
+    that API is also subject to Blizzard's Developer API Terms of Use.
+  - World of Warcraft is a trademark of Blizzard Entertainment, Inc. This is a
+    fan-made tool, not affiliated with or endorsed by Blizzard.
+  - The Monster Compendium uses QuestieDB (github.com/Questie/QuestieDB), the
+    Questie addon's community database. It is not included in this package:
+    the app downloads it from GitHub on your computer when you choose to, and
+    it stays under its own authors' terms.
+  - The Pixelify Sans and VT323 fonts built into the app belong to their
+    authors and are licensed under the SIL Open Font License 1.1
+    (https://openfontlicense.org). That license covers only the fonts.
+
+ENDING
+  Your permission to use the app ends automatically if you break these terms.

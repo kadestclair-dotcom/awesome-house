@@ -1,0 +1,80 @@
+# Awesome House
+
+**Know what it's worth before you list it.**
+A free Windows companion app that reads the World of Warcraft auction house for you. Built for **WoW: Forever**, with retail supported too.
+
+> **Beta 0.14.** Features are still being added and you may run into bugs. Please [report them](../../issues).
+
+**[Download the latest release](https://github.com/kadestclair-dotcom/awesome-house/releases)**
+
+---
+
+## What it does
+
+| Tab | What you get |
+| --- | --- |
+| **Search** | Browse auction-house categories, filter by quality, level and price, and see the price at every auction house side by side. |
+| **Watchlist** | Day, Week and Month trends, a price history chart, a sell helper that shows your payout after the 5% cut, the best time to sell, and price alerts. |
+| **Character** | Look up a character, scan every gear slot, and see which items for sale are an upgrade your class can actually use (Upgrade %). |
+| **Monster Compendium** *(new)* | Every monster in each region, what it drops (priced on the AH), and the quests that need it or its drops. Names link to Wowhead or Warcraft Wiki. Track the monsters you're farming, with a kill counter and notes. |
+| **Professions** | Every Blizzard recipe priced at current auction prices, material prices, and gold per hour for gathering sessions. |
+| **Guides** | Leveling guides 1–300 for all 12 professions, priced live, with the cheapest option marked. |
+| **Tools** | Flip finder, custom crafting recipes, fishing spot planner, CSV export. |
+
+## Get started (about 5 minutes)
+
+1. Download `AwesomeHouse-….zip` from the [Releases page](../../releases) and unzip it into a folder of its own, e.g. `Desktop\Awesome House`.
+2. Run `AwesomeHouse.exe`. The app isn't code-signed yet, so Windows may say *"Windows protected your PC"*. Click **More info**, then **Run anyway**.
+3. Create a free Blizzard API client at [develop.battle.net](https://develop.battle.net/access/clients) and paste its Client ID and Secret into the setup window. The `README.txt` in the zip walks through every field.
+
+## Is it safe to download?
+
+You shouldn't have to take anyone's word for it, so here is how you can check:
+
+- **The source code is right here.** You can read all of it.
+- **GitHub builds every release itself**, on its own Windows machine, straight from this code (see [`.github/workflows/release.yml`](.github/workflows/release.yml)). Nobody uploads an exe by hand.
+- **Each release has a signed build record.** With the [GitHub CLI](https://cli.github.com/) installed, run
+  `gh attestation verify AwesomeHouse-<version>.zip --repo kadestclair-dotcom/awesome-house`
+  to confirm the file came from this repository's code.
+- **Each release lists SHA-256 checksums** in `SHA256SUMS.txt`. In PowerShell, `Get-FileHash .\AwesomeHouse-*.zip` should print the same code.
+- **Your data stays on your PC.** You use your own Blizzard key. The app never asks for your Battle.net password. It only talks to Blizzard's API, and to GitHub to download the free [QuestieDB](https://github.com/Questie/QuestieDB) monster data (it asks first).
+
+More in [SECURITY.md](SECURITY.md).
+
+## Things to know
+
+- Blizzard's WoW: Forever API isn't officially documented, so parts of the app could break if Blizzard changes it.
+- Blizzard is missing data for many Classic-era items, so some items have no name, stats or upgrade score.
+- Prices update about once an hour. Price history only records while the app is open.
+- The 5% auction house cut and the upgrade scores are estimates.
+- The Monster Compendium's data is community-made and still filling in for Forever's new areas. Drop chances are only known for quest items.
+- Your Blizzard Client Secret is saved in `wow_price_config.json` next to the app. Don't share your app folder once it's set up.
+
+## Support the project
+
+Awesome House is free, and **every feature is free for everyone**. That isn't only a choice: Blizzard's [Developer API Terms](https://www.blizzard.com/en-us/legal/a2989b50-5f16-43b1-abec-2ae17cc09dd6/blizzard-developer-api-terms-of-use) don't allow apps like this to charge for downloads or sell premium features.
+
+If it saves you gold and you'd like to say thanks, you can donate at **[paypal.me/keedoyesyes](https://paypal.me/keedoyesyes)**. Donations never unlock anything in the app. See [docs/support.md](docs/support.md) for what supporters get.
+
+## Report a bug or suggest something
+
+Open an [issue](../../issues), or use **Support › Report a bug** in the app. Screenshots help. Never post your Client Secret.
+
+## Build it yourself
+
+Requires Windows and Python 3.12 (only the standard library is used).
+
+```bat
+build_exe.bat
+```
+
+This installs PyInstaller, builds `dist\AwesomeHouse.exe`, and zips the share package. To make an official release, see [docs/publishing.md](docs/publishing.md).
+
+## License and credits
+
+**Source-available, all rights reserved.** © 2026 Kade. The code is public so you can see exactly what the app does. You may use the app for free for personal, non-commercial use. Please don't redistribute, sell, rebrand or publish modified copies. Full terms are in [LICENSE](LICENSE).
+
+- Monster Compendium data: [QuestieDB](https://github.com/Questie/QuestieDB), the Questie addon's community database. It is downloaded separately on your computer and isn't part of this repository.
+- Pixel fonts [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans) and [VT323](https://fonts.google.com/specimen/VT323) under the SIL Open Font License 1.1. The capital C and G and the lowercase c of Pixelify Sans were modified to be easier to read at small sizes.
+
+Awesome House is a fan-made tool, not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.

@@ -1,0 +1,126 @@
+{
+ "forever:light leather": {
+  "id": 2318,
+  "name": "Light Leather"
+ },
+ "forever:barbaric shoulders": {
+  "id": 5964,
+  "name": "Barbaric Shoulders"
+ },
+ "forever:black dye": {
+  "id": 2325,
+  "name": "Black Dye"
+ },
+ "forever:coarse thread": {
+  "id": 2320,
+  "name": "Coarse Thread"
+ },
+ "forever:cured heavy hide": {
+  "id": 4236,
+  "name": "Cured Heavy Hide"
+ },
+ "forever:dark leather boots": {
+  "id": 40,
+  "name": "Recruit's Boots"
+ },
+ "forever:dark leather pants": {
+  "id": 39,
+  "name": "Recruit's Pants"
+ },
+ "forever:dusky bracers": {
+  "id": 710,
+  "name": "Bracers of the People's Militia"
+ },
+ "forever:embossed leather gloves": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:fine leather belt": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:fine thread": {
+  "id": 2321,
+  "name": "Fine Thread"
+ },
+ "forever:gray dye": {
+  "id": 4340,
+  "name": "Gray Dye"
+ },
+ "forever:guardian gloves": {
+  "id": 203,
+  "name": "Thick Cloth Gloves"
+ },
+ "forever:handstitched leather cloak": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:heavy armor kit": {
+  "id": 4265,
+  "name": "Heavy Armor Kit"
+ },
+ "forever:heavy leather": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:hillman's leather gloves": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:light armor kit": {
+  "id": 2304,
+  "name": "Light Armor Kit"
+ },
+ "forever:medium leather": {
+  "id": 2319,
+  "name": "Medium Leather"
+ },
+ "forever:nightscape boots": {
+  "id": 40,
+  "name": "Recruit's Boots"
+ },
+ "forever:nightscape headband": {
+  "id": 8176,
+  "name": "Nightscape Headband"
+ },
+ "forever:nightscape pants": {
+  "id": 39,
+  "name": "Recruit's Pants"
+ },
+ "forever:rugged leather": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:rune thread": {
+  "id": 14341,
+  "name": "Rune Thread"
+ },
+ "forever:silken thread": {
+  "id": 4291,
+  "name": "Silken Thread"
+ },
+ "forever:thick armor kit": {
+  "id": 8173,
+  "name": "Thick Armor Kit"
+ },
+ "forever:thick leather": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:wicked leather bracers": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:wicked leather headband": {
+  "id": 61,
+  "name": "Dwarven Leather Pants"
+ },
+ "forever:gold ore": {
+  "id": 2776,
+  "name": "Gold Ore"
+ },
+ "forever:raw mackerlin": {
+  "id": 4603,
+  "name": "Raw Spotted Yellowtail"
+ }
+}

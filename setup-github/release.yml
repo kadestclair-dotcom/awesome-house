@@ -1,0 +1,104 @@
+# Builds AwesomeHouse.exe on GitHub's own Windows machine, straight from the code in
+# this repository, then publishes it as a release with a checksum file and a signed
+# build record ("attestation") that proves the download came from this code.
+#
+# How to make a release: push a tag that starts with "v", e.g. v0.14-beta
+#   (GitHub Desktop: Repository > Create tag..., then Push origin)
+# Or run it by hand from the Actions tab (Run workflow): that builds the zip and
+# keeps it as a downloadable artifact without publishing a release.
+
+name: Build and release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write        # create the release
+  id-token: write        # sign the build record
+  attestations: write    # store the build record
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Read the app version
+        id: ver
+        shell: pwsh
+        run: |
+          $m = Select-String -Path wow_price_gui.pyw -Pattern 'APP_VERSION = "([^"]+)"' | Select-Object -First 1
+          if (-not $m) { throw "APP_VERSION not found in wow_price_gui.pyw" }
+          $v = $m.Matches[0].Groups[1].Value
+          $slug = $v -replace '\s+', '-'
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "zip=AwesomeHouse-$slug.zip" >> $env:GITHUB_OUTPUT
+          Write-Host "Building Awesome House $v"
+
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade "pyinstaller>=6.10,<7"
+
+      - name: Build AwesomeHouse.exe
+        run: >
+          python -m PyInstaller --noconfirm --clean --onefile --windowed
+          --name AwesomeHouse --icon ah_coin_icon.ico
+          --add-data "ah_coin_icon.ico;." --add-data "item_info.json;."
+          --add-data "item_stats.json;." --add-data "item_cache.json;."
+          wow_price_gui.pyw
+
+      - name: Make the share zip and checksums
+        shell: pwsh
+        run: |
+          $pkg = "out/Awesome House"
+          New-Item -ItemType Directory -Force $pkg | Out-Null
+          Copy-Item dist/AwesomeHouse.exe $pkg
+          Copy-Item package/* $pkg
+          Compress-Archive -Path $pkg -DestinationPath "out/${{ steps.ver.outputs.zip }}" -Force
+          $sums = foreach ($f in @("out/${{ steps.ver.outputs.zip }}", "$pkg/AwesomeHouse.exe")) {
+            "{0}  {1}" -f (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(), (Split-Path $f -Leaf)
+          }
+          $sums | Set-Content -Encoding ascii out/SHA256SUMS.txt
+          Get-Content out/SHA256SUMS.txt
+
+      - name: Sign the build record
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            out/${{ steps.ver.outputs.zip }}
+            out/Awesome House/AwesomeHouse.exe
+
+      - name: Keep the build (manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.ver.outputs.zip }}
+          path: |
+            out/${{ steps.ver.outputs.zip }}
+            out/SHA256SUMS.txt
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Awesome House ${{ steps.ver.outputs.version }}
+          prerelease: ${{ contains(steps.ver.outputs.version, 'Beta') }}
+          files: |
+            out/${{ steps.ver.outputs.zip }}
+            out/SHA256SUMS.txt
+          body: |
+            **Download:** `${{ steps.ver.outputs.zip }}` below. Unzip it into a folder of its own and run `AwesomeHouse.exe`. The README inside walks you through the free Blizzard API key.
+
+            **Check your download** (optional): in PowerShell, run `Get-FileHash .\${{ steps.ver.outputs.zip }}` and compare the code with the one in `SHA256SUMS.txt`.
+            This file was built by GitHub from the code in this repository. Anyone can confirm that with the GitHub CLI:
+            `gh attestation verify ${{ steps.ver.outputs.zip }} --repo ${{ github.repository }}`
+
+            **Windows warning:** the app isn't code-signed yet, so Windows may say "Windows protected your PC". Click *More info*, then *Run anyway*.
+
+            Awesome House is free. Nothing is locked behind a payment. If it saves you gold, see *Support the project* in the README.

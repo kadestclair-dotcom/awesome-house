@@ -1,0 +1,29 @@
+# ---- NEVER commit these: your Blizzard API secret and personal data ----
+wow_price_config.json
+.wow_price_cache/
+watchlist.json
+price_history.db
+characters.json
+fishing_sessions.json
+fishing_spots.json
+recipes.json
+guide_progress.json
+monster_tracking.json
+guides/
+
+# ---- build output (GitHub builds releases itself) ----
+build/
+dist/
+share_package/
+*.spec
+*.zip
+__pycache__/
+*.pyc
+
+# ---- local backups and debugging files ----
+*.backup-*
+*backup*.py
+*backup*.pyw
+ah_diagnosis.txt
+diagnose_ah.py
+run_diagnosis.bat
