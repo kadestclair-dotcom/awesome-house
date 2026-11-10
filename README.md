@@ -1,11 +1,12 @@
 # Awesome House
 
-**Know what it's worth before you list it.**
+[![Awesome House: know what it's worth before you list it](docs/images/banner.png)](https://kadestclair-dotcom.github.io/awesome-house/)
+
 A free Windows companion app that reads the World of Warcraft auction house for you. Built for **WoW: Forever**, with retail supported too.
 
-> **Beta 0.14.** Features are still being added and you may run into bugs. Please [report them](../../issues).
+**[⬇ Download the latest release](https://github.com/kadestclair-dotcom/awesome-house/releases)** · **[Website](https://kadestclair-dotcom.github.io/awesome-house/)** · **[Illustrated tour (PDF)](docs/about-awesome-house.pdf)**
 
-**[Download the latest release](https://github.com/kadestclair-dotcom/awesome-house/releases)**
+> **Beta 0.14.** Features are still being added and you may run into bugs. Please [report them](../../issues).
 
 ---
 

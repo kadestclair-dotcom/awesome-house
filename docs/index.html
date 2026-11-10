@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Awesome House: auction house price checker for WoW: Forever</title>
+<meta name="description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades and a Monster Compendium.">
+<link rel="icon" href="favicon.ico">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Awesome House">
+<meta property="og:title" content="Awesome House: know what it's worth before you list it">
+<meta property="og:description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades and a Monster Compendium.">
+<meta property="og:url" content="https://kadestclair-dotcom.github.io/awesome-house/">
+<meta property="og:image" content="https://kadestclair-dotcom.github.io/awesome-house/images/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17110c">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@300;400;500;700&family=VT323&display=swap">
+<style>
+/* Pixelify Sans (SIL OFL 1.1) with the capital C and G opened up so C doesn't read as O */
+@font-face { font-family: "Pixelify Sans"; font-weight: 500; font-display: swap; src: url(fonts/pixelify-sans-500.woff2) format("woff2"); }
+@font-face { font-family: "Pixelify Sans"; font-weight: 700; font-display: swap; src: url(fonts/pixelify-sans-700.woff2) format("woff2"); }
+</style>
+<style>
+/* Layout: one dark leather-and-gold world (the app's own look). Hero with a live-style item card, benefit trio, feature grid by tab, privacy ledger, steps, risk table, FAQ. */
+:root {
+  --bg: #17110c;
+  --panel: #231a12;
+  --panel-2: #2d2118;
+  --line: #5a4228;
+  --gold: #e6b84c;
+  --gold-dim: #a8822f;
+  --red: #a52f22;
+  --red-hi: #c9422f;
+  --fg: #eadfc6;
+  --muted: #b3a384;
+  --good: #1eff00;
+  --rare: #4aa3ff;
+  --epic: #c06bff;
+  --legend: #ff8a1f;
+  --silver: #c9ced6;
+  --copper: #d98a52;
+  --f-display: "Pixelify Sans", "Courier New", monospace;
+  --f-body: "Alegreya Sans", Georgia, "Segoe UI", sans-serif;
+  --f-data: "VT323", "Courier New", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-weight: 300;
+  font-size: 18px;
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 56px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 700; line-height: 1.1; text-wrap: balance; margin: 0; }
+h1, h2, h3, .btn, .name, .num, .lbl, summary, .steps b, .brand, .feat h3, .note b, .mini-btns span { font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0; }
+h2 { font-size: clamp(26px, 4vw, 38px); color: var(--gold); }
+h3 { font-size: 20px; color: var(--fg); }
+p { margin: 0; }
+b, strong { font-weight: 500; }
+a { color: var(--gold); }
+.eyebrow { font-family: var(--f-data); font-size: 22px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold-dim); }
+.lede { color: var(--muted); max-width: 62ch; }
+section { padding-block: 64px 0; }
+.sec-head { display: grid; gap: 10px; margin-bottom: 28px; }
+
+/* pixel panel: stepped corners, no radius */
+.px { background: var(--panel); border: 3px solid var(--line); box-shadow: 0 0 0 3px #0c0805, 6px 6px 0 3px #0c0805; }
+a:focus-visible, summary:focus-visible, .btn:focus-visible { outline: 3px solid var(--rare); outline-offset: 3px; }
+
+/* top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; border-bottom: 3px solid var(--line); flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; font-family: var(--f-display); font-weight: 700; font-size: 20px; color: var(--gold); }
+.ver { font-family: var(--f-data); font-weight: 400; font-size: 19px; letter-spacing: .08em; text-transform: uppercase; color: var(--legend); border: 2px solid currentColor; padding: 0 8px; line-height: 1.3; }
+.coin { width: 28px; height: 28px; background: radial-gradient(circle at 35% 30%, #fff1b0 0 12%, var(--gold) 13% 62%, var(--gold-dim) 63% 100%); border: 3px solid #5c4313; image-rendering: pixelated; clip-path: polygon(20% 0, 80% 0, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0 80%, 0 20%); }
+.bar nav { display: flex; gap: 20px; font-family: var(--f-data); font-size: 22px; letter-spacing: .06em; flex-wrap: wrap; }
+.bar nav a { text-decoration: none; color: var(--muted); }
+.bar nav a:hover { color: var(--gold); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 48px; align-items: center; padding-block: 64px 8px; }
+.hero h1 { font-size: clamp(36px, 6.2vw, 64px); color: var(--fg); }
+.hero h1 em { font-style: normal; color: var(--gold); }
+.hero .lede { font-size: 20px; margin-top: 20px; color: var(--muted); }
+.cta-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 28px; }
+.btn { display: inline-block; font-family: var(--f-display); font-weight: 700; font-size: 18px; padding: 12px 22px; text-decoration: none; border: 3px solid #0c0805; box-shadow: inset 0 0 0 3px var(--gold-dim), 4px 4px 0 #0c0805; }
+.btn.red { background: var(--red); color: #fff2d1; }
+.btn.red:hover { background: var(--red-hi); }
+.btn.ghost { background: var(--panel-2); color: var(--gold); }
+.btn.ghost:hover { background: #3a2b1d; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 30px; font-family: var(--f-data); font-size: 22px; color: var(--muted); }
+.chips b { color: var(--gold); font-weight: 400; }
+
+/* example item card */
+.card { padding: 18px; display: grid; gap: 14px; }
+.card .tag { font-family: var(--f-data); font-size: 18px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.item { display: flex; align-items: center; gap: 12px; }
+.icon { width: 44px; height: 44px; flex: none; border: 3px solid var(--rare); background: linear-gradient(135deg, #1b3550, #0d1b2a); display: grid; place-items: center; font-family: var(--f-display); color: var(--rare); font-size: 20px; }
+.name { font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--rare); }
+.sub { font-family: var(--f-data); font-size: 19px; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; }
+.prices td { padding: 6px 0; border-top: 2px dashed var(--line); font-family: var(--f-data); font-size: 22px; }
+.prices td:last-child { text-align: right; white-space: nowrap; }
+.g, .s, .c { font-variant-numeric: tabular-nums; }
+.g::after, .s::after, .c::after { content: ""; display: inline-block; width: 9px; height: 9px; margin: 0 8px 0 4px; }
+.g::after { background: var(--gold); } .s::after { background: var(--silver); } .c::after { background: var(--copper); }
+.g { color: var(--gold); } .s { color: var(--silver); } .c { color: var(--copper); }
+.trend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: var(--f-data); font-size: 21px; }
+.trend div { background: var(--panel-2); padding: 6px 8px; border: 2px solid var(--line); }
+.up { color: #6fe36f; } .down { color: #ff7a66; }
+.spark { width: 100%; height: 64px; display: block; }
+.mini-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.mini-btns span { font-family: var(--f-display); font-size: 14px; padding: 6px 10px; background: var(--red); color: #fff2d1; border: 2px solid #0c0805; box-shadow: inset 0 0 0 2px var(--gold-dim); }
+.mini-btns span.alt { background: var(--panel-2); color: var(--gold); }
+
+/* benefits */
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.benefit { padding: 22px; display: grid; gap: 10px; align-content: start; }
+.benefit .kicker { font-family: var(--f-data); font-size: 22px; letter-spacing: .1em; text-transform: uppercase; }
+.benefit .num { font-family: var(--f-display); font-size: 34px; color: var(--gold); }
+.benefit p { color: var(--muted); }
+
+/* features */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
+.feat { padding: 22px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.feat.wide { grid-column: 1 / -1; }
+.feat.wide ul { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.feat .badge { font-family: var(--f-data); font-size: 20px; letter-spacing: .1em; text-transform: uppercase; }
+.feat .new { font-family: var(--f-data); font-size: 18px; color: var(--legend); border: 2px solid currentColor; padding: 0 6px; margin-left: 10px; letter-spacing: .08em; }
+.feat ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.feat li { padding-left: 20px; position: relative; color: var(--muted); }
+.feat li::before { content: ""; position: absolute; left: 0; top: .6em; width: 8px; height: 8px; background: var(--gold); }
+.q-common { color: #ffffff; } .q-good { color: var(--good); } .q-rare { color: var(--rare); } .q-epic { color: var(--epic); } .q-legend { color: var(--legend); }
+
+/* score box */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.formula { padding: 22px; display: grid; gap: 14px; color: var(--muted); }
+.formula b, .keysteps b { color: var(--fg); }
+.formula .eq { font-family: var(--f-data); font-size: 26px; color: var(--gold); }
+.formula .scroll { overflow-x: auto; }
+.formula table td, .formula table th { padding: 6px 10px 6px 0; text-align: left; font-family: var(--f-data); font-size: 21px; border-top: 2px dashed var(--line); white-space: nowrap; }
+.formula th { color: var(--muted); font-weight: 400; border-top: 0; }
+
+/* privacy ledger */
+.ledger { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.ledger .box { padding: 22px; display: grid; gap: 12px; align-content: start; }
+.ledger h3 { font-size: 22px; }
+.ledger ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-family: var(--f-data); font-size: 22px; }
+.ledger li { overflow-wrap: anywhere; }
+.stay h3 { color: var(--good); } .leave h3 { color: var(--rare); }
+
+/* steps */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; padding: 18px; }
+.steps li::before { content: counter(s); font-family: var(--f-display); font-weight: 700; font-size: 30px; color: #1b1308; background: var(--gold); display: grid; place-items: center; height: 56px; border: 3px solid #5c4313; }
+.steps p { color: var(--muted); }
+.steps b { color: var(--fg); font-family: var(--f-display); font-weight: 700; display: block; margin-bottom: 2px; font-size: 20px; }
+
+/* risks */
+.risks { overflow-x: auto; }
+.risks table { min-width: 720px; }
+.risks th { font-family: var(--f-data); font-weight: 400; font-size: 20px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 12px 16px; background: var(--panel-2); border-bottom: 3px solid var(--line); }
+.risks td { padding: 14px 16px; vertical-align: top; border-top: 2px dashed var(--line); color: var(--muted); }
+.risks td:first-child { font-family: var(--f-display); font-weight: 700; width: 24%; color: var(--fg); }
+.sev { display: inline-block; font-family: var(--f-data); font-size: 19px; letter-spacing: .08em; text-transform: uppercase; padding: 0 8px; border: 2px solid currentColor; margin-top: 6px; }
+.sev.high { color: #ff7a66; } .sev.mid { color: var(--legend); } .sev.low { color: var(--rare); }
+
+/* faq */
+details { background: var(--panel); border: 3px solid var(--line); padding: 14px 18px; }
+details + details { margin-top: 14px; }
+summary { cursor: pointer; font-family: var(--f-display); font-weight: 700; font-size: 20px; color: var(--gold); }
+details p { margin-top: 10px; color: var(--muted); max-width: 70ch; }
+
+footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line); color: var(--muted); font-size: 15px; display: grid; gap: 8px; }
+
+/* key setup: the Blizzard form, field by field */
+.keyform { padding: 22px; display: grid; gap: 0; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 22px; align-items: start; padding-block: 18px; border-top: 2px dashed var(--line); }
+.field:first-child { border-top: 0; padding-top: 0; }
+.field .lbl { font-family: var(--f-display); font-weight: 700; font-size: 19px; color: var(--fg); }
+.field .input { font-family: var(--f-data); font-size: 22px; line-height: 1.2; background: #0c0805; border: 2px solid var(--line); padding: 6px 10px; color: var(--gold); margin-top: 8px; overflow-wrap: anywhere; }
+.field .input.blank { color: var(--muted); }
+.field .why { display: grid; gap: 6px; color: var(--muted); }
+.field .why b { color: var(--fg); font-weight: 700; }
+.field .alt { font-family: var(--f-data); font-size: 20px; color: var(--muted); }
+.keysteps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 10px; counter-reset: k; color: var(--muted); }
+.keysteps li { counter-increment: k; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; }
+.keysteps li::before { content: counter(k); font-family: var(--f-display); font-weight: 700; color: #1b1308; background: var(--gold); width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid #5c4313; }
+.keysteps code, .field code { font-family: var(--f-data); font-size: 21px; color: var(--gold); }
+.note { margin-top: 22px; padding: 16px 18px; border: 2px solid var(--legend); background: var(--panel); color: var(--muted); display: grid; gap: 6px; }
+.note b { font-family: var(--f-display); color: var(--legend); }
+
+@media (max-width: 820px) {
+  .field { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .hero, .split, .ledger, .trio { grid-template-columns: minmax(0, 1fr); }
+  .hero { gap: 36px; padding-top: 40px; }
+  section { padding-top: 48px; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .feat.wide ul { grid-template-columns: minmax(0, 1fr); }
+}
+@media print {
+  .px, details, .note, tr { break-inside: avoid; }
+  .sec-head { break-after: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="brand"><span class="coin" aria-hidden="true"></span>Awesome House <span class="ver">Beta 0.14</span></div>
+    <nav aria-label="Page sections">
+      <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">Download</a>
+      <a href="#features">Features</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#start">Get started</a>
+      <a href="#key-setup">Key setup</a>
+      <a href="#straight-talk">Straight talk</a>
+      <a href="#support">Support</a>
+      <a href="https://github.com/kadestclair-dotcom/awesome-house">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Free &middot; Beta 0.14 &middot; For WoW: Forever &middot; retail supported too</p>
+        <h1 style="margin-top:10px">Know what it's worth <em>before you list it.</em></h1>
+        <p class="lede">A Windows desktop companion app that reads the auction house for you. See prices at every auction house, follow trends, get alerted when an item crosses your number, find out which gear upgrade is actually worth the gold, and look up what every monster drops.</p>
+        <div class="cta-row">
+          <a class="btn red" href="https://github.com/kadestclair-dotcom/awesome-house/releases">Download free on GitHub</a>
+          <a class="btn ghost" href="about-awesome-house.pdf">Illustrated tour (PDF)</a>
+        </div>
+        <div class="chips">
+          <span><b>12</b> profession guides, 1&ndash;300</span>
+          <span><b>~15</b> auction houses compared</span>
+          <span><b>3,700+</b> monsters in the compendium</span>
+          <span><b>Hourly</b> price checks</span>
+          <span><b>Your</b> own Blizzard key</span>
+        </div>
+      </div>
+
+      <aside class="px card" aria-label="Example item card">
+        <div class="tag">Example only, not live prices</div>
+        <div class="item">
+          <div class="icon" aria-hidden="true">E</div>
+          <div><div class="name">Elixir of Agility</div><div class="sub">Consumable &middot; Alchemy</div></div>
+        </div>
+        <table class="prices" aria-label="Example prices per auction house">
+          <tbody>
+            <tr><td>House A</td><td><span class="g">1</span><span class="s">24</span><span class="c">10</span></td></tr>
+            <tr><td>House B</td><td><span class="g">1</span><span class="s">31</span><span class="c">55</span></td></tr>
+            <tr><td>House C</td><td><span class="g">1</span><span class="s">18</span><span class="c">02</span></td></tr>
+          </tbody>
+        </table>
+        <svg class="spark" viewBox="0 0 300 64" preserveAspectRatio="none" role="img" aria-label="Example 30-day price line">
+          <polyline fill="none" stroke="#e6b84c" stroke-width="3" points="0,46 25,42 50,48 75,38 100,40 125,30 150,34 175,24 200,28 225,20 250,26 275,14 300,18"/>
+          <rect x="294" y="12" width="8" height="8" fill="#e6b84c"/>
+        </svg>
+        <div class="trend">
+          <div>Day <span class="up">+4%</span></div>
+          <div>Week <span class="down">-2%</span></div>
+          <div>Month <span class="up">+11%</span></div>
+        </div>
+        <div class="mini-btns"><span>+ Watchlist</span><span class="alt">Set alert...</span><span class="alt">Best time to sell</span></div>
+      </aside>
+    </div>
+
+    <section id="why">
+      <div class="sec-head">
+        <p class="eyebrow">Why use it</p>
+        <h2>Stop guessing at the auction house.</h2>
+        <p class="lede">Every listing you post on a hunch, every material you buy at the wrong time, every gear piece you replace without checking costs gold. This app puts the numbers in front of you.</p>
+      </div>
+      <div class="trio">
+        <div class="px benefit">
+          <span class="kicker q-good">Sell smarter</span>
+          <span class="num">Price it right</span>
+          <p>Compare every auction house side by side, see the payout after the 5% cut, and learn which weekdays and 3-hour windows your item's price tends to run highest.</p>
+        </div>
+        <div class="px benefit">
+          <span class="kicker q-rare">Level cheaper</span>
+          <span class="num">1&ndash;300 for less</span>
+          <p>Leveling guides for all 12 professions price every step live and mark the cheapest option in each skill bracket. Your progress is saved.</p>
+        </div>
+        <div class="px benefit">
+          <span class="kicker q-epic">Farm with a plan</span>
+          <span class="num">Know the drops</span>
+          <p>Pick a zone, see every monster in it, what each one drops at today's auction prices, and which quests need it. Track the ones you're farming.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="sec-head">
+        <p class="eyebrow">Everything inside</p>
+        <h2>Seven tools in one window.</h2>
+        <p class="lede">Each tab does one job. Together they cover buying, selling, crafting, leveling, gearing and farming.</p>
+      </div>
+      <div class="grid">
+        <article class="px feat">
+          <span class="badge q-common">Search</span>
+          <h3>Find anything on the auction house</h3>
+          <ul>
+            <li>Browse the same category list the game uses, loaded straight from Blizzard</li>
+            <li>Filter by quality, required level, price range, or items currently for sale</li>
+            <li>Sort results and see the price at each auction house on every card</li>
+            <li>Add items to your Watchlist in one click, or open them on Wowhead</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-good">Watchlist</span>
+          <h3>Track the items you care about</h3>
+          <ul>
+            <li>Items grouped by category, with Day, Week and Month trends after one Check all</li>
+            <li>Price history chart for every item</li>
+            <li>Sell helper shows your payout after the auction house cut</li>
+            <li>Best time to sell, worked out from your own recorded history (hours after about 2 days of data, weekdays after about a week)</li>
+            <li>Price alerts above or below a number you choose</li>
+            <li>Alerts and history refresh every hour while the app is open</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-rare">Character</span>
+          <h3>Find your next upgrade</h3>
+          <ul>
+            <li>Look up a character and see level, class, race and every gear slot, empty ones included</li>
+            <li>Click a slot for its stats, double-click to scan only that slot, or scan them all</li>
+            <li>Upgrades are limited to what your class can wear and wield</li>
+            <li>Each result shows an Upgrade % over your equipped item</li>
+            <li>A "Why these results?" breakdown shows how many items were known, for sale, usable, missing data, or better</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-epic">Professions hub</span>
+          <h3>See what crafting really costs</h3>
+          <ul>
+            <li>Every recipe Blizzard publishes for each crafting profession, priced at current auction prices</li>
+            <li>Gathering professions show material prices</li>
+            <li>Log a gathering session with the spot or route and the time it took to get gold per hour</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-legend">Leveling guides</span>
+          <h3>Skill 1&ndash;300, all 12 professions</h3>
+          <ul>
+            <li>Options for each skill bracket, priced live, with the best value marked</li>
+            <li>Trainer notes and a Wowhead link at each step</li>
+            <li>Your place in the guide is saved</li>
+            <li>Guides are plain files, so you can customize them</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-good">Tools menu</span>
+          <h3>The extras that pay for themselves</h3>
+          <ul>
+            <li>Flip finder lists items listed below what they typically resell for, after the auction house cut</li>
+            <li>Custom crafting recipes with profit worked out for you</li>
+            <li>Fishing spot planner and session value</li>
+            <li>CSV export of your price history and sessions, for spreadsheets</li>
+            <li>Pixel-art look with quality-colored item names and coin icons</li>
+          </ul>
+        </article>
+        <article class="px feat wide">
+          <span class="badge q-legend">Monster Compendium<span class="new">New</span></span>
+          <h3>Every monster, what it drops, and why you'd hunt it</h3>
+          <ul>
+            <li>Monsters listed by region: Eastern Kingdoms, Kalimdor, the new Forever areas, dungeons and raids</li>
+            <li>Each monster's drops, priced at the lowest current auction listing, plus the most valuable one</li>
+            <li>Every quest that needs the monster or its drops, with level, faction, quest giver and objective</li>
+            <li>Monster names link to Wowhead or Warcraft Wiki, whichever you prefer</li>
+            <li>Track the monsters you're farming, with a kill counter and notes</li>
+            <li>Search by monster name, or by an item to see who drops it</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="score">
+      <div class="split">
+        <div class="sec-head" style="margin-bottom:0">
+          <p class="eyebrow">No black box</p>
+          <h2>See how the upgrade score works.</h2>
+          <p class="lede">Some tools give you a number and ask you to trust it. This one shows its math. The efficiency score multiplies how many stat points an item is worth by how well those stats suit your class.</p>
+          <p class="lede">Items with no stats published by Blizzard get a fit of 50%, shown with a ~ so you know it is an estimate. You can also switch to comparing stats only, or item level only.</p>
+        </div>
+        <div class="px formula">
+          <div class="eq">Efficiency = Power &times; Fit</div>
+          <p><b>Power</b> estimates stat points from item level, quality and slot, using the Classic item-budget formula. <b>Fit</b> is the share of the item's main stats your class values. Weapon DPS and armor are added on top.</p>
+          <div class="scroll">
+            <table aria-label="Power by quality">
+              <thead><tr><th>Quality</th><th>Base budget</th></tr></thead>
+              <tbody>
+                <tr><td class="q-good">Uncommon</td><td>(ilvl &minus; 8) / 2</td></tr>
+                <tr><td class="q-rare">Rare</td><td>(ilvl &minus; 0.75) / 1.8</td></tr>
+                <tr><td class="q-epic">Epic</td><td>(ilvl &minus; 26) / 1.2</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="sub">Then multiplied by a slot modifier: 1.0, 0.75, 0.5625, 0.4219 or 0.3164.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="privacy">
+      <div class="sec-head">
+        <p class="eyebrow">Private by design</p>
+        <h2>Your key. Your data. Your PC.</h2>
+        <p class="lede">There is no account to make, no shared login and no server collecting your lists. You create your own free Blizzard API key, and the app keeps everything beside itself on your computer.</p>
+      </div>
+      <div class="ledger">
+        <div class="px box stay">
+          <h3>Stays on your computer</h3>
+          <ul>
+            <li>Your Blizzard API ID and secret</li>
+            <li>Watchlist and alerts</li>
+            <li>Price history database</li>
+            <li>Characters you looked up</li>
+            <li>Guide progress and fishing sessions</li>
+            <li>Tracked monsters, kill counts and notes</li>
+          </ul>
+        </div>
+        <div class="px box leave">
+          <h3>Goes over the internet</h3>
+          <ul>
+            <li>Login and data requests to Blizzard's servers, using your own key</li>
+            <li>GitHub, once, to download the free QuestieDB monster data when you first open the Monster Compendium (and when you click Update data)</li>
+            <li>Wowhead or Warcraft Wiki, only when you click a link, and only in your browser</li>
+          </ul>
+          <p class="sub" style="font-size:20px">The app never asks for your Battle.net password. Every other request stays on your machine.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="start">
+      <div class="sec-head">
+        <p class="eyebrow">Get started</p>
+        <h2>Ready in about five minutes.</h2>
+      </div>
+      <ol class="steps">
+        <li class="px"><div><b>Download it and give it its own folder</b><p>Get the latest zip from the official Releases page, <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">github.com/kadestclair-dotcom/awesome-house/releases</a>, and unzip it into a folder such as Desktop\Awesome House. The app saves its files beside itself, so a dedicated folder keeps them together.</p></div></li>
+        <li class="px"><div><b>Open it</b><p>Windows may say "Windows protected your PC." Click More info, then Run anyway. The first launch takes a few seconds while it unpacks.</p></div></li>
+        <li class="px"><div><b>Make your free Blizzard API key</b><p>A setup window opens with a button that takes you to develop.battle.net. Create a client there, then paste the Client ID and Secret into the window. You only do this once. The next section walks through every field on Blizzard's form.</p></div></li>
+        <li class="px"><div><b>Search, add, and let it watch</b><p>Search for an item, add it to your Watchlist, and set an alert. Leave the app open and it checks again every hour, building your price history as it goes.</p></div></li>
+      </ol>
+    </section>
+
+    <section id="key-setup">
+      <div class="sec-head">
+        <p class="eyebrow">Key setup</p>
+        <h2>Blizzard's form, field by field.</h2>
+        <p class="lede">Your key is a free "API client" on Blizzard's developer site. The form is written for website developers, so it asks about redirect and service URLs. This app doesn't use either of them. It only needs the Client ID and Client Secret you get at the end.</p>
+      </div>
+      <ol class="keysteps">
+        <li><span>Click the button in the app's setup window, or go to <code>develop.battle.net/access/clients</code>, and sign in with your normal Battle.net account.</span></li>
+        <li><span>Choose <b>Create Client</b> and fill in the form as shown below.</span></li>
+        <li><span>Save, then open your new client to see its Client ID and Client Secret.</span></li>
+        <li><span>Copy both into the app's setup window and click save. You're done.</span></li>
+      </ol>
+      <div class="px keyform">
+        <div class="field">
+          <div><div class="lbl">Client Name</div><div class="input">Awesome House</div></div>
+          <div class="why"><p>Any name you like. Only you see it.</p></div>
+        </div>
+        <div class="field">
+          <div><div class="lbl">Redirect URLs</div><div class="input blank">(leave empty)</div></div>
+          <div class="why">
+            <p><b>What it is:</b> where a website sends people back after a "Log in with Battle.net" button.</p>
+            <p><b>Why you can skip it:</b> this app never logs anyone in. It only reads public auction and character data, so this address is never used.</p>
+            <p class="alt">If the form won't save without one, enter http://localhost</p>
+          </div>
+        </div>
+        <div class="field">
+          <div><div class="lbl">Service URL</div><div class="input blank">(leave empty)</div></div>
+          <div class="why">
+            <p><b>What it is:</b> the website of the project using the key.</p>
+            <p><b>Why you can skip it:</b> you're running a desktop app, not a website. If you see a checkbox that says "I do not have a service URL for this client", tick it.</p>
+          </div>
+        </div>
+        <div class="field">
+          <div><div class="lbl">Intended Use</div><div class="input">Personal desktop app to check World of Warcraft auction house prices.</div></div>
+          <div class="why"><p>A short, honest sentence about what you'll use the key for. Copying this one is fine.</p></div>
+        </div>
+        <div class="field">
+          <div><div class="lbl">Client ID and Client Secret</div><div class="input blank">(shown after you save)</div></div>
+          <div class="why"><p><b>These are the only two things the app needs.</b> Paste them into the setup window. Treat the Client Secret like a password, and don't post it or send it to anyone.</p></div>
+        </div>
+      </div>
+      <div class="note">
+        <b>If saving the form gives an error</b>
+        <p>Blizzard's form sometimes fails with a generic error that has nothing to do with what you typed. Wait a few minutes and try again. Leaving both URL fields empty is the setup most players report working.</p>
+      </div>
+    </section>
+
+    <section id="straight-talk">
+      <div class="sec-head">
+        <p class="eyebrow">Straight talk</p>
+        <h2>What to know before you run it.</h2>
+        <p class="lede">Every tool has limits, and this one is still in beta. Here are its limits, plainly, with what to do about each.</p>
+      </div>
+      <div class="px risks">
+        <table>
+          <thead><tr><th>Topic</th><th>What it means</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Beta software<br><span class="sev mid">Expect bugs</span></td>
+              <td>Awesome House is at Beta 0.14. Features are still being added and some things will break or change between versions.</td>
+              <td>Use Support &gt; Report a bug when something looks wrong. Screenshots help.</td>
+            </tr>
+            <tr>
+              <td>Windows warning<br><span class="sev mid">Expect it</span></td>
+              <td>The app is not code-signed, so Windows SmartScreen shows "Windows protected your PC." Some antivirus programs also wrongly flag apps packaged with PyInstaller.</td>
+              <td>Click More info, then Run anyway. Only download from the official GitHub Releases page, where every release is built by GitHub from the public code. If your antivirus flags it, check the zip against SHA256SUMS.txt on the release.</td>
+            </tr>
+            <tr>
+              <td>Your API secret is stored as plain text<br><span class="sev high">Protect it</span></td>
+              <td>Your Client Secret is saved in <code>wow_price_config.json</code> next to the app. Anyone who gets that file could use your key.</td>
+              <td>Do not zip up and share the app folder after you have set it up. If it leaks, delete the client at develop.battle.net and make a new one.</td>
+            </tr>
+            <tr>
+              <td>Unofficial data source<br><span class="sev mid">May change</span></td>
+              <td>Blizzard's WoW: Forever API was undocumented as of November 2026, so endpoints can change and break parts of the app.</td>
+              <td>Keep an eye out for updates if a tab stops loading.</td>
+            </tr>
+            <tr>
+              <td>Some items have no data<br><span class="sev low">Limit</span></td>
+              <td>Blizzard's item lookup is missing many Classic-era items in Forever. One developer found 652 of 1,515 auction item IDs missing.</td>
+              <td>Expect gaps in names, stats and upgrade results. The "Why these results?" panel shows when data is the reason.</td>
+            </tr>
+            <tr>
+              <td>Monster data is community-made<br><span class="sev low">Limit</span></td>
+              <td>The Monster Compendium uses QuestieDB, the Questie addon's community database. Its Forever data is still filling in, so some new monsters, drops and quests are missing. Drop chances are only known for quest items.</td>
+              <td>Click Update data now and then to get the latest release. Use the Wowhead link to double-check a drop before you farm for hours.</td>
+            </tr>
+            <tr>
+              <td>History starts when you do<br><span class="sev low">Limit</span></td>
+              <td>Price history is recorded only while the app is open, one point per hourly snapshot. Trends need time to fill in.</td>
+              <td>Leave it running in the background while you play, especially for items you care about.</td>
+            </tr>
+            <tr>
+              <td>Estimates, not promises<br><span class="sev low">Limit</span></td>
+              <td>The auction house cut is assumed to be 5%, the Classic rate, and is not confirmed for Forever. Upgrade scores use rough leveling weights and are not a full simulation.</td>
+              <td>Treat results as a strong starting point. Check the tooltip on anything big before you spend or sell.</td>
+            </tr>
+            <tr>
+              <td>Not real-time<br><span class="sev low">Limit</span></td>
+              <td>Blizzard refreshes auction data about once an hour. Prices you see can be up to an hour old.</td>
+              <td>Re-check in game before a large purchase.</td>
+            </tr>
+            <tr>
+              <td>New characters<br><span class="sev low">Limit</span></td>
+              <td>In Forever, characters only show up in lookups from level 10, after you log out.</td>
+              <td>If a lookup fails, log out and try again in a few minutes.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="support">
+      <div class="split">
+        <div class="sec-head" style="margin-bottom:0">
+          <p class="eyebrow">Support the project</p>
+          <h2>Free to use. Kept alive by players.</h2>
+          <p class="lede">The app costs nothing. If it saves you gold, a donation helps keep it updated as Blizzard's API changes.</p>
+          <p class="lede">Donations are optional and never unlock anything. Everyone gets the same app.</p>
+        </div>
+        <div class="px formula">
+          <div class="eq">Say thanks</div>
+          <p>Donate through PayPal. You can also find this link in the app under Help &gt; Support the project, or with the Support button.</p>
+          <p><b>Found a bug?</b> Choose Support &gt; Report a bug in the app. It opens an email with a ready-made report, or you can write to <span class="sub" style="font-size:21px">kadestclair@gmail.com</span> directly.</p>
+          <p><a class="btn red" href="https://paypal.me/keedoyesyes">Donate on PayPal</a></p>
+          <p class="sub">paypal.me/keedoyesyes</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq">
+      <div class="sec-head"><p class="eyebrow">Questions</p><h2>Quick answers.</h2></div>
+      <details>
+        <summary>Does it touch my game account?</summary>
+        <p>No. The app does not interact with the game client and never asks for your Battle.net password. It reads data through Blizzard's public developer API using a key you create yourself.</p>
+      </details>
+      <details>
+        <summary>Does the Blizzard API key cost anything?</summary>
+        <p>No. Blizzard API keys are free to create at develop.battle.net, and the app needs nothing else running in the background.</p>
+      </details>
+      <details>
+        <summary>Does it work for retail WoW?</summary>
+        <p>Yes. It is built for WoW: Forever and supports retail as well. For retail, character lookups use the character name and realm. The Monster Compendium covers Forever only.</p>
+      </details>
+      <details>
+        <summary>Where does the monster data come from?</summary>
+        <p>From QuestieDB, the free community database behind the Questie addon. It isn't packed into the app: the first time you open the Monster Compendium, the app asks before downloading it from GitHub (about 14 MB) and keeps it on your computer.</p>
+      </details>
+      <details>
+        <summary>Can I back up or move my data?</summary>
+        <p>Everything lives in files beside the app, so copying the folder moves your watchlist, history and tracked monsters. Keep in mind that it also copies your API secret, so only move it between your own computers. You can export price history and fishing sessions to CSV from the app.</p>
+      </details>
+      <details>
+        <summary>Can I share it with friends?</summary>
+        <p>Please send them the official download page, <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">github.com/kadestclair-dotcom/awesome-house/releases</a>, instead of passing your copy on. The license asks that copies only come from there, and once your copy is set up, its folder holds your private API secret.</p>
+      </details>
+      <details>
+        <summary>What if my antivirus blocks it?</summary>
+        <p>This happens with many apps built the same way. If you trust where you got the file, add the app's folder as an exception, or ask whoever shared it for the checksum so you can verify the file is unchanged.</p>
+      </details>
+    </section>
+
+    <footer>
+      <p>Official download: <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">github.com/kadestclair-dotcom/awesome-house/releases</a> &middot; Source code: <a href="https://github.com/kadestclair-dotcom/awesome-house">github.com/kadestclair-dotcom/awesome-house</a> &middot; <a href="about-awesome-house.pdf">Illustrated tour (PDF)</a></p>
+      <p>Awesome House Beta 0.14 &middot; &copy; 2026 Kade. All rights reserved. Free for personal, non-commercial use. Full terms are in LICENSE.txt, included with the app.</p>
+      <p>Awesome House is a fan-made tool and is not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
+      <p>Monster Compendium data: QuestieDB (github.com/Questie/QuestieDB), downloaded separately on your computer. Pixel fonts Pixelify Sans and VT323 are used under the SIL Open Font License 1.1.</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
