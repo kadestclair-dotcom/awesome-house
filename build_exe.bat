@@ -1,10 +1,10 @@
 @echo off
 rem Builds dist\AwesomeHouse.exe from the files in this folder, then puts it in
 rem share_package\Awesome House\ (with README, LICENSE and the About PDF) and
-rem zips that folder as AwesomeHouse-Beta-0.14.zip, ready to send.
+rem zips that folder as AwesomeHouse-Beta-0.15.zip, ready to send.
 setlocal
 set APPNAME=AwesomeHouse
-set VERSION=Beta-0.14
+set VERSION=Beta-0.15
 set PKG=share_package\Awesome House
 cd /d "%~dp0"
 findstr /c:"YOUR_PAYPAL_NAME" wow_price_gui.pyw >nul && (
@@ -15,7 +15,7 @@ findstr /c:"YOUR_PAYPAL_NAME" wow_price_gui.pyw >nul && (
 set PY=python
 where py >nul 2>nul && set PY=py
 %PY% -m pip install --upgrade pyinstaller
-%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --name %APPNAME% --icon ah_coin_icon.ico --add-data "ah_coin_icon.ico;." --add-data "item_info.json;." --add-data "item_stats.json;." --add-data "item_cache.json;." wow_price_gui.pyw
+%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --name %APPNAME% --icon ah_coin_icon.ico --add-data "ah_coin_icon.ico;." --add-data "item_info.json;." --add-data "item_stats.json;." --add-data "item_cache.json;." --add-data "dungeon_travel.json;." wow_price_gui.pyw
 echo.
 if not exist dist\%APPNAME%.exe (
   echo Build failed - see the messages above.

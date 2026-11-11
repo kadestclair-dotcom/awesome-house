@@ -28,7 +28,7 @@ import zipfile
 
 import wow_price as wp
 
-INDEX_SCHEMA = 3
+INDEX_SCHEMA = 9
 REPO = "Questie/QuestieDB"
 FALLBACK_VERSION = "1.0.13"
 DATA_DIR = os.path.join(wp.CACHE_DIR, "questiedb")
@@ -47,8 +47,10 @@ RANKS = {0: "", 1: "Elite", 2: "Rare Elite", 3: "Boss", 4: "Rare"}
 ITEM_CLASSES = {0: "Consumable", 1: "Container", 2: "Weapon", 3: "Gem", 4: "Armor", 5: "Reagent",
                 6: "Projectile", 7: "Trade Goods", 9: "Recipe", 11: "Quiver", 12: "Quest",
                 13: "Key", 15: "Miscellaneous"}
-ALLIANCE_RACES = 1 | 4 | 8 | 64 | (1 << 32)      # human, dwarf, night elf, gnome, Alliance Skyborne
-HORDE_RACES = 2 | 16 | 32 | 128 | (1 << 33)      # orc, undead, tauren, troll, Horde Skyborne
+# Forever's Skyborne races use bits 32 and 33. A Horde Skyborne character has completed quests
+# limited to bit 32 alone, so those bits don't say which faction a quest is for and are ignored.
+ALLIANCE_RACES = 1 | 4 | 8 | 64                  # human, dwarf, night elf, gnome
+HORDE_RACES = 2 | 16 | 32 | 128                  # orc, undead, tauren, troll
 NOT_MONSTER = re.compile(r"trigger|bunny|\(|\[|invisible|\bdnd\b|\bdnr\b|spawn point|waypoint|"
                          r"\bunused\b|\btest\b|\bcredit\b|\bdummy\b|\bbeacon\b|\breuse\b|programmer", re.I)
 FOREVER_ZONES = {616, 16651, 16606}              # Mount Hyjal, Shen'dralas, Darkspear Islands
@@ -287,6 +289,31 @@ def _zone_names(zf):
     return names
 
 
+def _dungeon_entries(zf, zone_names):
+    """{area id: {"n": name, "alt": [ids], "p": parent zone name, "e": [[zone name, x, y, label]]}}
+    from QuestieDB's dungeon table: where each dungeon's entrance is on the world map."""
+    out = {}
+    try:
+        text = zf.read(_member(zf, "support/Forever/Zones/dungeons.lua")).decode("utf-8", "replace")
+    except KeyError:
+        return out
+    row = re.compile(r'^\s*\[(\d+)\]\s*=\s*\{"([^"]+)",(\{[\d,]*\}|nil),(\d+),\{(.*)\}\},?\s*(?:--\s*(.*))?$')
+
+    def area(a):
+        return zone_names.get(a, (f"Area {a}", ""))[0]
+    for line in text.splitlines():
+        m = row.match(line)
+        if not m or "isHorde" in line:
+            continue
+        note = (m.group(6) or "").split(":")[0].strip()
+        label = note if re.fullmatch(r"(North|South|East|West|The [A-Z][a-z]+)", note) else ""
+        ents = [[area(int(a)), float(x), float(y), label]
+                for a, x, y in re.findall(r"\{(\d+),\s*([\d.]+),\s*([\d.]+)\}", m.group(5))]
+        out[int(m.group(1))] = {"n": m.group(2), "alt": [int(a) for a in re.findall(r"\d+", m.group(3))],
+                                "p": area(int(m.group(4))), "e": ents}
+    return out
+
+
 def _parents(zf):
     out = {}
     try:
@@ -324,6 +351,36 @@ def _member(zf, suffix):
     raise KeyError(suffix)
 
 
+def _spots(spawns, top_zone):
+    """[[zone id, x, y, spawn points]] - the busiest spot per zone, most spawns first.
+    Dungeon spawns have no map position (-1, -1) and are left out."""
+    zones = {}
+    if isinstance(spawns, list):
+        spawns = {i + 1: v for i, v in enumerate(spawns) if v}
+    for zid, pts in (spawns or {}).items():
+        try:
+            zid = top_zone(int(zid))
+        except (TypeError, ValueError):
+            continue
+        for p in _arr(pts):
+            p = _arr(p)
+            if len(p) >= 2 and isinstance(p[0], (int, float)) and isinstance(p[1], (int, float)) \
+                    and p[0] > 0 and p[1] > 0:
+                zones.setdefault(zid, []).append((float(p[0]), float(p[1])))
+    out = []
+    for zid, pts in zones.items():
+        sample = pts[:250]
+        best = max(sample, key=lambda a: sum(1 for b in sample if abs(a[0] - b[0]) < 3 and abs(a[1] - b[1]) < 3))
+        out.append([zid, round(best[0], 1), round(best[1], 1), len(pts)])
+    out.sort(key=lambda t: -t[3])
+    return out[:3]
+
+
+def way(zone, x, y, label=""):
+    """A TomTom waypoint command for the game's chat box."""
+    return f"/way {zone} {x:g} {y:g} {label}".strip()
+
+
 def _faction(mask):
     mask = int(mask or 0)
     a, h = bool(mask & ALLIANCE_RACES), bool(mask & HORDE_RACES)
@@ -350,6 +407,8 @@ def build_index(version=None, progress=print):
     zone_names = _zone_names(zf)
     parents = _parents(zf)
     rates = _drop_rates(zf)
+    dungeons = _dungeon_entries(zf, zone_names)
+    dungeon_areas = {a for zid, d in dungeons.items() for a in [zid] + d["alt"]}
 
     def top_zone(z):
         seen = set()
@@ -409,6 +468,12 @@ def build_index(version=None, progress=print):
              "si": [n for n in _arr(started[2] if len(started) > 2 else None) if n],
              "en": [n for n in _arr(finished[0] if finished else None) if n],
              "t": " ".join(t for t in text if isinstance(t, str))[:400]}
+        q["x"] = [r.get(7) or 0,                                      # class mask
+                  [n for n in _arr(toc.field("Quest", qid, 13, r)) if n],   # needs any one of these done
+                  [n for n in _arr(toc.field("Quest", qid, 12, r)) if n],   # needs all of these done
+                  [n for n in _arr(toc.field("Quest", qid, 16, r)) if n],   # can't be done after these
+                  int(r.get(24) or 0) & 1,                             # repeatable
+                  r.get(17) or 0]                                      # raw zone (negative = a category)
         if kills:
             q["k"] = sorted(kills)
         if collects:
@@ -423,12 +488,16 @@ def build_index(version=None, progress=print):
     # --- NPCs: keep hostile ones with spawns (the monsters), remember names of quest givers
     npcs = {}
     zone_counts = {}
+    npc_loc = {}                                     # quest givers: where they stand
     giver_ids = {n for q in quest_rows.values() for n in q["sn"] + q["en"]}
     for nid in toc.ids("Npc"):
         r = toc.row("Npc", nid)
         name = r.get(1) or ""
         if nid in giver_ids:
             npc_names[nid] = name
+            spots = _spots(toc.field("Npc", nid, 7, r), top_zone)
+            if spots:
+                npc_loc[nid] = spots[0][:3]
         if r.get(13) or not name or NOT_MONSTER.search(name):
             continue                                 # friendly to a faction, or a technical NPC
         spawns = toc.field("Npc", nid, 7, r) or {}
@@ -453,6 +522,9 @@ def build_index(version=None, progress=print):
             continue                                 # new Forever NPC with no faction data: only keep
                                                      # it if it drops loot or is a kill target
         npcs[nid] = {"n": name, "l": [lmin, lmax], "r": r.get(6) or 0, "z": z}
+        spots = _spots(spawns, top_zone)
+        if spots:
+            npcs[nid]["p"] = spots
         if r.get(14):
             npcs[nid]["s"] = r[14]
         for zid, cnt in z.items():
@@ -471,6 +543,27 @@ def build_index(version=None, progress=print):
             used_q.update(collect_q.get(i, []))
             if items.get(i, {}).get("sq"):
                 used_q.add(items[i]["sq"])
+    # every quest, compact, for the Progress tab: [name, level, required level, faction, zone,
+    # class mask, needs-one, needs-all, exclusive-to, repeatable, first giver, turn-in, objective,
+    # giver's spot [zone, x, y] or 0, turn-in's spot]
+    allq, qzones = {}, {}
+    for qid, q in quest_rows.items():
+        x = q.pop("x")
+        zt = top_zone(x[5]) if x[5] > 0 else 0
+        if zt and zt not in qzones:
+            qzones[zt] = zone_names.get(zt, (f"Area {zt}", ""))[0]
+        giver = next((npc_names.get(n) for n in q["sn"] if npc_names.get(n)), "")
+        ender = next((npc_names.get(n) for n in q["en"] if npc_names.get(n)), "")
+        gloc = next((npc_loc[n] for n in q["sn"] if npc_names.get(n) and n in npc_loc), 0)
+        eloc = next((npc_loc[n] for n in q["en"] if npc_names.get(n) and n in npc_loc), 0)
+        for loc in (gloc, eloc):
+            if loc and loc[0] not in qzones:
+                qzones[loc[0]] = zone_names.get(loc[0], (f"Area {loc[0]}", ""))[0]
+        allq[qid] = [q["n"], q.get("lv") or 0, q.get("rl") or 0, q["fa"], zt, x[0], x[1], x[2], x[3], x[4], giver,
+                     ender, q.get("t") or "", gloc, eloc]
+
+    # quests filed under a dungeon stay too, even with no kill or collect objective
+    used_q.update(qid for qid, q in quest_rows.items() if q.get("z") in dungeon_areas)
     quests = {}
     for qid in used_q:
         q = quest_rows.get(qid)
@@ -489,7 +582,7 @@ def build_index(version=None, progress=print):
         zones[zid] = {"n": name, "g": group, "m": cnt}
 
     idx = {"schema": INDEX_SCHEMA, "version": version, "built": int(time.time()),
-           "zones": zones, "npcs": npcs, "drops": drops, "items": items, "quests": quests}
+           "zones": zones, "dungeons": dungeons, "allq": allq, "qzones": qzones, "npcs": npcs, "drops": drops, "items": items, "quests": quests}
     tmp = INDEX_PATH + ".part"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(idx, f, separators=(",", ":"))
@@ -513,6 +606,9 @@ class Compendium:
         self.drops = {int(k): v for k, v in idx["drops"].items()}
         self.items = {int(k): v for k, v in idx["items"].items()}
         self.quests = {int(k): v for k, v in idx["quests"].items()}
+        self.dungeons = {int(k): v for k, v in idx.get("dungeons", {}).items()}
+        self.allq = {int(k): v for k, v in idx.get("allq", {}).items()}
+        self.qzones = {int(k): v for k, v in idx.get("qzones", {}).items()}
         self.by_zone = {}
         for nid, n in self.npcs.items():
             for z in n["z"]:
@@ -565,7 +661,7 @@ class Compendium:
         return sorted(self.by_zone.get(zid, []), key=lambda n: (self.npcs[n]["l"][0], self.npcs[n]["n"]))
 
     def search(self, text, limit=300):
-        t = text.lower().strip()
+        t = text.replace("\u2019", "'").lower().strip()
         if not t:
             return []
         hits = [nid for nid, n in self.npcs.items() if t in n["n"].lower()]
@@ -576,13 +672,25 @@ class Compendium:
 
     def find_by_drop(self, text, limit=300):
         """Monsters that drop an item whose name contains the text."""
-        t = text.lower().strip()
+        t = text.replace("\u2019", "'").lower().strip()
         ids = {i for i, it in self.items.items() if t and t in it["n"].lower()}
         hits = [nid for nid, lst in self.drops.items() if ids.intersection(lst)]
         return sorted(hits, key=lambda n: self.npcs[n]["n"])[:limit]
 
+    def where(self, nid):
+        """[(zone name, x, y, spawn points)] - the busiest spot in each zone the monster is in."""
+        return [(self.zone_name(z), x, y, n) for z, x, y, n in self.npcs[nid].get("p", [])]
+
+    def quest_spot(self, qid, end=False):
+        """(zone name, x, y) of a quest's giver (or its turn-in), or None."""
+        q = self.allq.get(qid)
+        loc = q[14 if end else 13] if q and len(q) > 14 else 0
+        return (self.qzones.get(loc[0]) or self.zone_name(loc[0]), loc[1], loc[2]) if loc else None
+
     def level_text(self, nid):
         a, b = self.npcs[nid]["l"]
+        if a >= 100 or b >= 100:
+            return "??"                              # skull level: always above the player
         return f"{a}" if a == b or not b else f"{a}-{b}"
 
     def rank_text(self, nid):

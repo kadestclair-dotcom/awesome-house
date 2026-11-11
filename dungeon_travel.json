@@ -1,0 +1,671 @@
+{
+ "_about": [
+  "Travel notes for the Dungeons tab of Awesome House.",
+  "Routes are written from Classic-era geography and have NOT been checked in WoW: Forever yet.",
+  "To correct one: edit its steps and set \"verified\": true. A copy of this file next to AwesomeHouse.exe overrides the built-in one, dungeon by dungeon.",
+  "kind is \"dungeon\" or \"raid\" (leave empty if unknown). The key is the dungeon's area id; entrance coordinates come from QuestieDB, not from this file."
+ ],
+ "dungeons": {
+  "2437": {
+   "name": "Ragefire Chasm",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "None nearby",
+    "steps": [
+     "The entrance is inside Orgrimmar, the Horde capital, so expect guards and players the whole way.",
+     "Enter Orgrimmar and head for the Cleft of Shadow; the portal is in the cave at the back."
+    ]
+   },
+   "horde": {
+    "flight": "Orgrimmar",
+    "steps": [
+     "Walk to the Cleft of Shadow inside Orgrimmar.",
+     "The portal is in the cave at the back of the Cleft."
+    ]
+   },
+   "notes": "Inside a Horde city.",
+   "verified": false
+  },
+  "718": {
+   "name": "Wailing Caverns",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Ratchet (The Barrens)",
+    "steps": [
+     "Take the boat from Booty Bay to Ratchet if you don't have the flight point.",
+     "Ride west past the Crossroads road, then south-west to the oasis; the cave mouth is in the hillside above the water.",
+     "Follow the cave down to the portal."
+    ]
+   },
+   "horde": {
+    "flight": "The Crossroads (The Barrens)",
+    "steps": [
+     "Ride south-west from the Crossroads to the oasis.",
+     "The cave mouth is in the hillside above the water; follow the cave down to the portal."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "1581": {
+   "name": "The Deadmines",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Sentinel Hill (Westfall)",
+    "steps": [
+     "Ride south to Moonbrook.",
+     "Enter the mine through the large building at the edge of town.",
+     "Follow the tunnels down, keeping to the main path, until you reach the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Grom'gol Base Camp or Booty Bay (Stranglethorn Vale)",
+    "steps": [
+     "Ride north through Stranglethorn into Duskwood, then west into Westfall.",
+     "Head to Moonbrook in the south of Westfall and enter the mine through the large building at the edge of town.",
+     "Follow the tunnels down to the portal."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "209": {
+   "name": "Shadowfang Keep",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Southshore (Hillsbrad Foothills)",
+    "steps": [
+     "Ride west along the road into Silverpine Forest.",
+     "The keep stands on the hill above Pyrewood Village, just inside Silverpine; take the path up to the gate."
+    ]
+   },
+   "horde": {
+    "flight": "The Sepulcher (Silverpine Forest)",
+    "steps": [
+     "Ride south along the main road.",
+     "The keep is on the hill above Pyrewood Village; take the path up to the gate."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "719": {
+   "name": "Blackfathom Deeps",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Auberdine (Darkshore)",
+    "steps": [
+     "Ride south along the coast road into Ashenvale.",
+     "At the Zoram Strand on the north-west coast, enter the ruined temple and follow the tunnel down.",
+     "Swim through the flooded cave to reach the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Zoram'gar Outpost (Ashenvale)",
+    "steps": [
+     "The outpost is on the Zoram Strand, a short walk from the entrance.",
+     "Enter the ruined temple, follow the tunnel down and swim through the flooded cave to the portal."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "717": {
+   "name": "The Stockade",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Stormwind City",
+    "steps": [
+     "The entrance is inside Stormwind, on the canals between Old Town and the Mage Quarter."
+    ]
+   },
+   "horde": {
+    "flight": "None nearby",
+    "steps": [
+     "The entrance is inside Stormwind, the Alliance capital, so expect guards and players the whole way.",
+     "It is on the canals between Old Town and the Mage Quarter."
+    ]
+   },
+   "notes": "Inside an Alliance city.",
+   "verified": false
+  },
+  "721": {
+   "name": "Gnomeregan",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Ironforge",
+    "steps": [
+     "Leave Ironforge and ride west through Dun Morogh, past Kharanos and Brewnall Village.",
+     "The entrance is in the far west of the zone; take the lift down and follow the halls to the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Booty Bay (Stranglethorn Vale)",
+    "steps": [
+     "In Classic, Horde reach Gnomeregan with the goblin teleporter in Booty Bay after a short quest.",
+     "Without it, the overland trip runs through Alliance territory in Dun Morogh."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "491": {
+   "name": "Razorfen Kraul",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Theramore Isle (Dustwallow Marsh)",
+    "steps": [
+     "Ride west through Dustwallow Marsh into the Barrens, then south along the road.",
+     "The Kraul is in the far south-west corner of the Barrens, under the giant thorn vines."
+    ]
+   },
+   "horde": {
+    "flight": "Camp Taurajo (The Barrens)",
+    "steps": [
+     "Ride south along the road toward the Great Lift.",
+     "Turn west before the lift; the Kraul is in the far south-west corner, under the giant thorn vines."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "796": {
+   "name": "Scarlet Monastery",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Chillwind Camp (Western Plaguelands)",
+    "steps": [
+     "Ride north-west through the Western Plaguelands and cross into Tirisfal Glades at the Bulwark.",
+     "Follow the road north, then east; the monastery sits in the hills in the north-east of Tirisfal.",
+     "The wings each have their own door inside the main building."
+    ]
+   },
+   "horde": {
+    "flight": "Undercity",
+    "steps": [
+     "Leave the Undercity and ride north-east past Brill.",
+     "The monastery sits in the hills in the north-east of Tirisfal; the wings each have their own door inside."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "722": {
+   "name": "Razorfen Downs",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Theramore Isle (Dustwallow Marsh)",
+    "steps": [
+     "Ride west through Dustwallow Marsh into the Barrens, then south along the road.",
+     "The Downs are at the southern end of the Barrens, east of the road near the Great Lift."
+    ]
+   },
+   "horde": {
+    "flight": "Camp Taurajo (The Barrens)",
+    "steps": [
+     "Ride south along the road toward the Great Lift.",
+     "The Downs are just before the lift, east of the road."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "1337": {
+   "name": "Uldaman",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Thelsamar (Loch Modan)",
+    "steps": [
+     "Ride south from Loch Modan into the Badlands.",
+     "The front entrance is the dig site in the north-west of the Badlands; follow the excavation tunnels to the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Kargath (Badlands)",
+    "steps": [
+     "Ride east from Kargath.",
+     "The front entrance is the dig site in the north of the Badlands; follow the excavation tunnels to the portal."
+    ]
+   },
+   "notes": "There is a second, back entrance further east in the Badlands.",
+   "verified": false
+  },
+  "1176": {
+   "name": "Zul'Farrak",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Gadgetzan (Tanaris)",
+    "steps": [
+     "Ride north-west from Gadgetzan to the troll city in the corner of Tanaris."
+    ]
+   },
+   "horde": {
+    "flight": "Gadgetzan (Tanaris)",
+    "steps": [
+     "Ride north-west from Gadgetzan to the troll city in the corner of Tanaris."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "2100": {
+   "name": "Maraudon",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Nijel's Point (Desolace)",
+    "steps": [
+     "Ride south down the length of Desolace.",
+     "The entrance is in the Valley of Spears in the west; go through the centaur camp and into the cave."
+    ]
+   },
+   "horde": {
+    "flight": "Shadowprey Village (Desolace)",
+    "steps": [
+     "Ride north-east from the village.",
+     "The entrance is in the Valley of Spears; go through the centaur camp and into the cave."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "1477": {
+   "name": "The Temple of Atal'Hakkar",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Nethergarde Keep (Blasted Lands)",
+    "steps": [
+     "Ride north into the Swamp of Sorrows.",
+     "The temple is on the island in the middle of the big lake; swim down the flooded stairs to reach the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Stonard (Swamp of Sorrows)",
+    "steps": [
+     "Ride east from Stonard to the big lake.",
+     "The temple is on the island in the middle; swim down the flooded stairs to reach the portal."
+    ]
+   },
+   "notes": "Also called the Sunken Temple.",
+   "verified": false
+  },
+  "1584": {
+   "name": "Blackrock Depths",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Thorium Point (Searing Gorge) or Morgan's Vigil (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Morgan's Vigil ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackrock Depths is at the bottom: go down from the central rock and through the quarry to the portal."
+    ]
+   },
+   "horde": {
+    "flight": "Thorium Point (Searing Gorge), Kargath (Badlands) or Flame Crest (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Flame Crest ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackrock Depths is at the bottom: go down from the central rock and through the quarry to the portal."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "1583": {
+   "name": "Blackrock Spire",
+   "kind": "dungeon",
+   "players": "5 (Lower), 10 (Upper)",
+   "alliance": {
+    "flight": "Thorium Point (Searing Gorge) or Morgan's Vigil (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Morgan's Vigil ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackrock Spire is at the top: cross from the central rock to the upper balcony and go up the ramp."
+    ]
+   },
+   "horde": {
+    "flight": "Thorium Point (Searing Gorge), Kargath (Badlands) or Flame Crest (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Flame Crest ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackrock Spire is at the top: cross from the central rock to the upper balcony and go up the ramp."
+    ]
+   },
+   "notes": "Lower and Upper Blackrock Spire share one entrance.",
+   "verified": false
+  },
+  "2557": {
+   "name": "Dire Maul",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Feathermoon Stronghold (Feralas)",
+    "steps": [
+     "Take the boat from the island to the mainland, then ride east along the road.",
+     "Dire Maul is the walled ruin in the middle of Feralas; each wing has its own door off the central courtyard."
+    ]
+   },
+   "horde": {
+    "flight": "Camp Mojache (Feralas)",
+    "steps": [
+     "Ride west along the road.",
+     "Dire Maul is the walled ruin in the middle of Feralas; each wing has its own door off the central courtyard."
+    ]
+   },
+   "notes": "Three wings: East, West and North.",
+   "verified": false
+  },
+  "2017": {
+   "name": "Stratholme",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Light's Hope Chapel (Eastern Plaguelands)",
+    "steps": [
+     "Ride west, then north through the Plaguewood.",
+     "The main gate is in the north-west of the Eastern Plaguelands."
+    ]
+   },
+   "horde": {
+    "flight": "Light's Hope Chapel (Eastern Plaguelands)",
+    "steps": [
+     "Ride west, then north through the Plaguewood.",
+     "The main gate is in the north-west of the Eastern Plaguelands."
+    ]
+   },
+   "notes": "A second, service entrance is further east along the city wall.",
+   "verified": false
+  },
+  "2057": {
+   "name": "Scholomance",
+   "kind": "dungeon",
+   "players": "5",
+   "alliance": {
+    "flight": "Chillwind Camp (Western Plaguelands)",
+    "steps": [
+     "Ride east to Darrowmere Lake.",
+     "Cross the bridge to Caer Darrow island; the entrance is the manor at the far end."
+    ]
+   },
+   "horde": {
+    "flight": "The Bulwark (Tirisfal Glades)",
+    "steps": [
+     "Ride south-east across the Western Plaguelands to Darrowmere Lake.",
+     "Cross the bridge to Caer Darrow island; the entrance is the manor at the far end."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "2717": {
+   "name": "Molten Core",
+   "kind": "raid",
+   "players": "40",
+   "alliance": {
+    "flight": "Thorium Point (Searing Gorge) or Morgan's Vigil (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Morgan's Vigil ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Molten Core's portal is deep inside Blackrock Depths; attuned players can use the window near the Depths entrance."
+    ]
+   },
+   "horde": {
+    "flight": "Thorium Point (Searing Gorge), Kargath (Badlands) or Flame Crest (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Flame Crest ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Molten Core's portal is deep inside Blackrock Depths; attuned players can use the window near the Depths entrance."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "2677": {
+   "name": "Blackwing Lair",
+   "kind": "raid",
+   "players": "40",
+   "alliance": {
+    "flight": "Thorium Point (Searing Gorge) or Morgan's Vigil (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Morgan's Vigil ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackwing Lair is reached through Upper Blackrock Spire; attuned players can use the orb by the Spire entrance."
+    ]
+   },
+   "horde": {
+    "flight": "Thorium Point (Searing Gorge), Kargath (Badlands) or Flame Crest (Burning Steppes)",
+    "steps": [
+     "From Thorium Point ride south-east to the Blackrock Mountain gate; from Flame Crest ride west across the Burning Steppes.",
+     "Inside the mountain, follow the ledge to the central rock hanging on chains over the lava.",
+     "Blackwing Lair is reached through Upper Blackrock Spire; attuned players can use the orb by the Spire entrance."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "2159": {
+   "name": "Onyxia's Lair",
+   "kind": "raid",
+   "players": "40",
+   "alliance": {
+    "flight": "Theramore Isle (Dustwallow Marsh)",
+    "steps": [
+     "Ride south-west through the marsh to the Wyrmbog.",
+     "The cave is in the far south of Dustwallow Marsh."
+    ]
+   },
+   "horde": {
+    "flight": "Brackenwall Village (Dustwallow Marsh)",
+    "steps": [
+     "Ride south through the marsh to the Wyrmbog.",
+     "The cave is in the far south of Dustwallow Marsh."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "1977": {
+   "name": "Zul'Gurub",
+   "kind": "raid",
+   "players": "20",
+   "alliance": {
+    "flight": "Darkshire (Duskwood)",
+    "steps": [
+     "Ride south into Stranglethorn Vale, then east.",
+     "The city gate is in the north-east of Stranglethorn Vale."
+    ]
+   },
+   "horde": {
+    "flight": "Grom'gol Base Camp (Stranglethorn Vale)",
+    "steps": [
+     "Ride north-east across northern Stranglethorn.",
+     "The city gate is in the north-east of Stranglethorn Vale."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "3429": {
+   "name": "Ruins of Ahn'Qiraj",
+   "kind": "raid",
+   "players": "20",
+   "alliance": {
+    "flight": "Cenarion Hold (Silithus)",
+    "steps": [
+     "Ride south to the Scarab Wall and through the gate.",
+     "The Ruins entrance is on the left."
+    ]
+   },
+   "horde": {
+    "flight": "Cenarion Hold (Silithus)",
+    "steps": [
+     "Ride south to the Scarab Wall and through the gate.",
+     "The Ruins entrance is on the left."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "3428": {
+   "name": "Temple of Ahn'Qiraj",
+   "kind": "raid",
+   "players": "40",
+   "alliance": {
+    "flight": "Cenarion Hold (Silithus)",
+    "steps": [
+     "Ride south to the Scarab Wall and through the gate.",
+     "The Temple entrance is straight ahead and to the right."
+    ]
+   },
+   "horde": {
+    "flight": "Cenarion Hold (Silithus)",
+    "steps": [
+     "Ride south to the Scarab Wall and through the gate.",
+     "The Temple entrance is straight ahead and to the right."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "3456": {
+   "name": "Naxxramas",
+   "kind": "raid",
+   "players": "40",
+   "alliance": {
+    "flight": "Light's Hope Chapel (Eastern Plaguelands)",
+    "steps": [
+     "Ride north-west into the Plaguewood.",
+     "The necropolis floats above it; the teleport circle is on the ground underneath."
+    ]
+   },
+   "horde": {
+    "flight": "Light's Hope Chapel (Eastern Plaguelands)",
+    "steps": [
+     "Ride north-west into the Plaguewood.",
+     "The necropolis floats above it; the teleport circle is on the ground underneath."
+    ]
+   },
+   "notes": "",
+   "verified": false
+  },
+  "15475": {
+   "name": "Demon Fall Canyon",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "16074": {
+   "name": "Karazhan Crypts",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "16236": {
+   "name": "Scarlet Enclave",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "16611": {
+   "name": "Ruins of Lordaeron",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "16919": {
+   "name": "The Hall of Thanes",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "16732": {
+   "name": "Excavation Site: Wetlands",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  },
+  "15531": {
+   "name": "The Tainted Scar",
+   "kind": "",
+   "players": "",
+   "alliance": {
+    "flight": "",
+    "steps": []
+   },
+   "horde": {
+    "flight": "",
+    "steps": []
+   },
+   "notes": "",
+   "verified": false
+  }
+ }
+}

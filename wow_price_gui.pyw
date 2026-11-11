@@ -1,10 +1,12 @@
 """
-Awesome House (Beta 0.14) - the window app for wow_price.py
+Awesome House (Beta 0.15) - the window app for wow_price.py
 Keep this file in the same folder as wow_price.py and double-click it to open.
 
 Features: price lookup, watchlist with Day/Week/Month trends, price history chart,
 price alerts (checked hourly while the app is open), fishing session value,
-Monster Compendium (monsters per region, their drops and quests, tracking list).
+Monster Compendium (monsters per region, their drops and quests, tracking list),
+Dungeons (entrances, routes, monsters, drops and quests per dungeon),
+Progress (a character's quests per zone, milestones, reputations, PvP, raids, and what to do next).
 """
 
 import base64
@@ -26,6 +28,9 @@ import tkinter.font as tkfont
 
 import wow_price as wp
 import wow_monsters as wm
+import wow_dungeons as wd
+import wow_progress as wpg
+import wow_loot as wl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUTO_CHECK_MS = 61 * 60 * 1000   # Blizzard refreshes data about hourly
@@ -34,7 +39,7 @@ DONATE_URL = "https://paypal.me/keedoyesyes"
 RELEASES_URL = "https://github.com/kadestclair-dotcom/awesome-house/releases"   # the official download page
 BUG_EMAIL = "kadestclair@gmail.com"
 APP_NAME = "Awesome House"
-APP_VERSION = "Beta 0.14"
+APP_VERSION = "Beta 0.15"
 
 
 # ================================================================ pixel-art WoW theme
@@ -379,6 +384,10 @@ class OutputText(tk.Text):
         self.urls[tag] = url
         self.insert("end", text, ("link", tag) + tags)
 
+    def emit_action(self, text, fn, *tags):
+        """A link that runs fn() instead of opening a web page."""
+        self.emit_link(text, fn, *tags)
+
     MONEY = re.compile(r"(?<![\w.])(\d[\d,]*)([gsc])(?![\w])")
 
     def end(self):
@@ -401,7 +410,11 @@ class OutputText(tk.Text):
         for tag in self.tag_names(idx):
             if tag in self.urls:
                 self._last_open = now
-                webbrowser.open_new_tab(self.urls[tag])
+                target = self.urls[tag]
+                if callable(target):
+                    target()
+                else:
+                    webbrowser.open_new_tab(target)
                 break
         return "break"
 
@@ -747,6 +760,8 @@ class App:
         tools.add_separator()
         tools.add_command(label="Crafting profit...", command=lambda: CraftingWindow(self))
         tools.add_separator()
+        tools.add_command(label="Guild crafters...", command=self.open_guild)
+        tools.add_separator()
         tools.add_command(label="Fishing session...", command=self.open_fishing)
         tools.add_command(label="Fishing spot planner...", command=lambda: SpotWindow(self))
         menubar.add_cascade(label="Tools", menu=tools)
@@ -790,6 +805,10 @@ class App:
         self.tabs.add(self.char_tab, text="  Character  ")
         self.monster_tab = MonsterTab(self.tabs, self)
         self.tabs.add(self.monster_tab, text="  Monster Compendium  ")
+        self.dungeon_tab = DungeonTab(self.tabs, self)
+        self.tabs.add(self.dungeon_tab, text="  Dungeons  ")
+        self.progress_tab = ProgressTab(self.tabs, self)
+        self.tabs.add(self.progress_tab, text="  Progress  ")
 
         self.refresh_list()
         self.show("Your watchlist, grouped by auction-house category.\n\n"
@@ -1153,6 +1172,24 @@ class App:
         self.cards.refresh_buttons()
         self.set_status(f"removed {e['name']}")
 
+    def open_guild(self):
+        """Who in the guild can craft what, for the guild of the character on the Progress tab."""
+        snap = getattr(self.progress_tab, "snap", None)
+        if not snap or not snap.get("guild"):
+            saved = wpg.load_saved()["chars"]
+            snap = next((c for c in saved.values() if c.get("guild")), None)
+        if not snap:
+            messagebox.showinfo("Guild crafters", "Load a character that's in a guild on the Progress tab first.",
+                                parent=self.root)
+            return
+        GuildWindow(self, snap.get("guild_slug") or wpg.guild_slug(snap["guild"]), snap["guild"])
+
+    def copy_way(self, text):
+        """Put a TomTom waypoint command on the clipboard."""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        Toast(self.root, "Copied. Paste it into the game's chat box (needs the TomTom addon):\n" + text)
+
     def in_background(self, work, done):
         """Run work() on a worker thread; done(result) runs back on the window thread."""
         def run():
@@ -1402,7 +1439,7 @@ class App:
             "Full terms are in LICENSE.txt next to the app.\n\n"
             "If it saves you gold, you can support the project at:\n" + DONATE_URL + "\n"
             "Donations are optional and don't unlock anything.\n\n"
-            "Monster Compendium data comes from QuestieDB (github.com/Questie/QuestieDB), "
+            "Monster Compendium and Dungeons data comes from QuestieDB (github.com/Questie/QuestieDB), "
             "the Questie addon's community database. It is downloaded from GitHub on your "
             "computer and isn't part of this app.\n\n"
             "Fan-made. Not affiliated with or endorsed by Blizzard Entertainment.",
@@ -1436,14 +1473,17 @@ class App:
             TimingWindow(self, e, self.game_key())
 
     def open_sell(self):
-        query = ""
+        query, picked = "", None
         if self.on_search_tab() and self.cards.selected_entry():
-            query = self.cards.selected_entry()["name"]
+            picked = self.cards.selected_entry()
         elif not self.on_search_tab() and self.selected_watch():
-            query = self.selected_watch()["name"]
+            picked = self.selected_watch()
+        if picked and picked.get("id") and picked.get("name"):
+            query, picked = picked["name"], {"id": picked["id"], "name": picked["name"]}
         else:
+            picked = None
             query = self.item.get().strip() or (self.selected_watch() or {}).get("name", "")
-        SellWindow(self, query)
+        SellWindow(self, query, picked)
 
     def export_history(self):
         self._export("Export price history", "wow_price_history.csv", wp.export_history_csv, "price points")
@@ -1894,8 +1934,9 @@ class ToolWindow(tk.Toplevel):
 # ---------------------------------------------------------------- sell helper
 
 class SellWindow(ToolWindow):
-    def __init__(self, app, query=""):
+    def __init__(self, app, query="", picked=None):
         super().__init__(app, "Sell-price helper", "820x560")
+        self.picked = picked               # {'id', 'name'} when opened from a selected item
         top = ttk.Frame(self, padding=12)
         top.pack(fill="x")
         ttk.Label(top, text="Item:").grid(row=0, column=0, sticky="w")
@@ -1927,7 +1968,8 @@ class SellWindow(ToolWindow):
             return
         my_qty = int(q) if q else None
         self.btn.config(state="disabled")
-        self.run(lambda api: wp.sell_advice(api, query, my_qty), self.render, f"Analyzing {query}...")
+        picked = self.picked if self.picked and self.picked["name"].lower() == query.lower() else None
+        self.run(lambda api: wp.sell_advice(api, query, my_qty, picked), self.render, f"Analyzing {query}...")
 
     def render(self, r, err, game):
         self.btn.config(state="normal")
@@ -2111,6 +2153,88 @@ class FlipWindow(ToolWindow):
                    + (" ..." if len(r["skipped"]) > 12 else "") +
                    "\nItems need about half a day of hourly prices before they can be judged.", "muted")
         o.end()
+
+
+# ---------------------------------------------------------------- guild crafters
+
+class GuildWindow(ToolWindow):
+    """Who in the guild can craft what: every member's professions and known recipes."""
+
+    def __init__(self, app, slug, name):
+        super().__init__(app, f"Guild crafters - {name}", "980x600")
+        self.slug, self.name, self.guild, self.busy = slug, name, None, False
+        top = ttk.Frame(self, padding=(12, 12, 12, 6))
+        top.pack(fill="x")
+        ttk.Label(top, text="Recipe or item").pack(side="left")
+        self.q = ttk.Entry(top, width=26, font=M(11))
+        self.q.pack(side="left", padx=(6, 6))
+        self.q.bind("<Return>", lambda e: self.show())
+        ttk.Button(top, text="Find", command=self.show).pack(side="left")
+        ttk.Button(top, text="All professions", command=lambda: (set_entry(self.q, ""), self.show())).pack(
+            side="left", padx=6)
+        self.btn = ttk.Button(top, text="Refresh from Blizzard", command=lambda: self.load(True))
+        self.btn.pack(side="right")
+        self.status = ttk.Label(self, foreground=MUTED, font=M(10), padding=(12, 0, 12, 6))
+        self.status.pack(fill="x")
+        self.table = DataTable(self, [(f"c{i}", "", w, a) for i, (w, a) in
+                                      enumerate([(260, "w"), (190, "w"), (150, "w"), (110, "e"), (70, "e")], 1)],
+                               height=16)
+        self.table.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        self.load()
+
+    def load(self, force=False):
+        if self.busy:
+            return
+        cached = wpg.guild_cached(self.slug)
+        if cached and not force:
+            self.guild = cached
+            self.show()
+            if time.time() - cached.get("fetched", 0) < wpg.GUILD_SECONDS:
+                return
+        if not wp.has_credentials():
+            self.status.config(text="Add your Blizzard API key first (restart the app to enter it).")
+            return
+        self.busy = True
+        self.btn.config(state="disabled")
+        self.status.config(text=f"Reading the roster of {self.name} from Blizzard...")
+
+        def progress(i, n):
+            self.app.results.put((lambda _r, i=i, n=n: self.status.config(
+                text=f"Reading members' professions: {i:,} of {n:,}..."), None))
+
+        def done(res):
+            guild, err = res
+            self.busy = False
+            self.btn.config(state="normal")
+            if guild is None:
+                self.status.config(text=(err or "Couldn't read the guild.").strip().replace("\n", " ")[:220])
+                return
+            self.guild = guild
+            self.show()
+        self.app.in_background(lambda: capture(lambda: wpg.guild_crafters(self.slug, progress, force=True)), done)
+
+    def show(self):
+        g = self.guild
+        if g is None:
+            return
+        text = self.q.get().strip()
+        tv = self.table.tree
+        tv.delete(*tv.get_children())
+        if text:
+            heads = ["RECIPE", "CRAFTER", "PROFESSION", "SKILL", "LEVEL"]
+            rows = [list(r) for r in wpg.find_crafters(g, text)[:600]]
+        else:
+            heads = ["PROFESSION", "MEMBER", "SKILL", "RECIPES KNOWN", "LEVEL"]
+            rows = [[p, m, f"{s} / {c}" if c else s, n or "", lv] for p, m, s, c, n, lv in wpg.guild_professions(g)]
+        for i, h in enumerate(heads, 1):
+            tv.heading(f"c{i}", text=h)
+        for n, r in enumerate(rows):
+            tv.insert("", "end", iid=str(n), values=r)
+        read = sum(1 for m in g["members"] if m.get("read"))
+        self.status.config(text=(f"{len(rows)} match{'es' if len(rows) != 1 else ''} for \"{text}\"  ·  " if text else "")
+                           + f"{g['name']}: {g.get('listed', len(g['members']))} members, professions read for {read}"
+                           f"  ·  read {clock(g.get('fetched', 0), '%b %d, %I:%M %p')}"
+                           "  ·  members under level 10 or not logged out yet can't be read")
 
 
 # ---------------------------------------------------------------- saved-list editor base
@@ -2820,6 +2944,8 @@ class CharacterTab(ttk.Frame):
         self.rows = {}
         self.view_slot = None          # None = best upgrades across all slots
         self.current = {}
+        self.drop_mode = False         # True = score what drops in dungeons instead of what's for sale
+        self.drop_busy = False
 
         top = ttk.Frame(self)
         top.pack(fill="x")
@@ -2892,6 +3018,8 @@ class CharacterTab(ttk.Frame):
                         command=self.refresh_view).pack(side="left")
         self.btn_all = ttk.Button(ctl2, text="Best upgrades (all slots)", command=self.show_all, state="disabled")
         self.btn_all.pack(side="right")
+        self.btn_drops = ttk.Button(ctl2, text="Upgrades from dungeons", command=self.show_drops, state="disabled")
+        self.btn_drops.pack(side="right", padx=(0, 6))
 
         srow = ttk.Frame(right)
         srow.pack(fill="x", pady=(6, 4))
@@ -2939,6 +3067,9 @@ class CharacterTab(ttk.Frame):
     def on_game_change(self):
         self.second_label.config(text="Surname" if self.forever() else "Realm")
         self.index = None
+        if self.drop_mode:
+            self.drop_mode = False
+            self.set_headings()
 
     def refresh_recent(self):
         game = self.app.game_key()
@@ -2987,6 +3118,7 @@ class CharacterTab(ttk.Frame):
                 self.status.config(text=(err or "Lookup failed.").splitlines()[-1])
                 return
             self.char = char
+            self.btn_drops.config(state="normal" if game == "forever" else "disabled")
             wp.remember_character({"name": char["name"], "surname": char.get("surname", ""),
                                    "realm": char.get("realm", "") if game != "forever" else "", "game": game})
             self.refresh_recent()
@@ -3065,8 +3197,100 @@ class CharacterTab(ttk.Frame):
         self.show_equipped(slot)
         self.refresh_view(keep_detail=True)
 
+    def set_headings(self):
+        tv, d = self.table.tree, self.drop_mode
+        tv.heading("item", text="ITEM THAT DROPS" if d else "ITEM FOR SALE")
+        tv.heading("price", text="ON THE AH" if d else "PRICE")
+        tv.heading("note", text="DROPPED BY" if d else "NOTE")
+        tv.column("note", width=280 if d else 150)
+
+    def show_drops(self):
+        """Switch the table to gear that drops in dungeons and raids, scored like the AH gear."""
+        if not self.char:
+            return
+        mt = self.app.monster_tab
+        if mt.db is None:
+            if not mt.loading and not mt.declined:
+                mt.load()
+            if mt.db is None:
+                self.status.config(text="Dungeon drops need the monster data. " +
+                                   ("It's loading - click again in a moment." if mt.loading else
+                                    "Open the Monster Compendium tab and click Update data first."))
+                return
+        self.drop_mode, self.view_slot = True, None
+        self.gear.tree.selection_remove(*self.gear.tree.selection())
+        self.set_headings()
+        todo = wl.not_asked(wl.dungeon_gear(mt.db))
+        if todo and not self.drop_busy and wp.has_credentials():
+            self.drop_busy = True
+
+            def progress(i, n):
+                self.app.results.put((lambda _r, i=i, n=n: self.status.config(
+                    text=f"Identifying dungeon gear: {i:,} of {n:,} (only needed once per item)..."), None))
+
+            def done(_res):
+                self.drop_busy = False
+                if self.drop_mode:
+                    self.refresh_view()
+            self.app.in_background(
+                lambda: capture(lambda: wp.fetch_items(wp.connect("forever"), todo, progress)), done)
+        self.refresh_view()
+
+    def refresh_drops(self, keep_detail=False):
+        mt = self.app.monster_tab
+        if not self.char or mt.db is None:
+            return
+        sources = self.index["sources"] if self.index else mt.sources
+        rows, counts = wl.drop_rows(self.char, mt.db, self.weights(), self.mode.get(), self.view_slot, sources)
+        self.current = {}
+        if self.view_slot:
+            if not self.show_all_gear.get():
+                rows = [r for r in rows if r["usable"]]
+            if self.only_upgrades.get():
+                rows = [r for r in rows if r["better"]]
+        else:
+            rows = wl.best_per_slot(rows)
+        keyf = {"Efficiency": lambda r: (not r["usable"], -r["eff"]),
+                "Item level": lambda r: (not r["usable"], -(r["ilvl"] or 0))}.get(
+                    self.sort.get(), lambda r: (not r["usable"], -r["gain"]))
+        rows.sort(key=keyf)
+        rows = rows[:400]
+        t = self.table.tree
+        t.delete(*t.get_children())
+        self.rows = {}
+        for n, r in enumerate(rows):
+            iid = f"{r['slot']}:{r['id']}:{n}"
+            self.rows[iid] = r
+            tags = ("nouse",) if not r["usable"] else ("q_" + (r["q"] or ""),) + (("better",) if r["better"] else ())
+            note = (r["why"] + "  ·  " if not r["usable"] else "") + wl.source_text(r)
+            up = ("new" if r["up_pct"] is None else f"{r['up_pct']:+.0f}%") if r["better"] else \
+                (f"{r['up_pct']:+.0f}%" if r["up_pct"] is not None else "--")
+            t.insert("", "end", iid=iid, tags=tags, values=(
+                r["slot_name"], r["name"], r["ilvl"] or "", f"{r['power']:.1f}",
+                f"{r['fit'] * 100:.0f}%" if r["fit"] is not None else "--",
+                ("~" if r["est"] else "") + f"{r['eff']:.1f}", up,
+                wp.fmt_gold(r["price"]) if r["price"] else "not sold", note))
+        n_up = sum(1 for r in rows if r["better"])
+        where = wp.SLOT_NAMES[self.view_slot] if self.view_slot else "All slots (best 4 each)"
+        gaps = f"  ·  {counts['missing']:,} of {counts['total']:,} dungeon items can't be scored (Blizzard has no data)"
+        if counts["unknown"]:
+            gaps = f"  ·  {counts['unknown']:,} items still being identified"
+        self.status.config(text=f"{where}: {len(rows)} dungeon drop{'s' if len(rows) != 1 else ''}  ·  "
+                                f"{n_up} upgrade{'s' if n_up != 1 else ''}{gaps}")
+        if not keep_detail:
+            self.detail.show(
+                "Upgrades from dungeons\n\nGear that only drops inside dungeons and raids, scored against what "
+                "you wear the same way as auction-house gear. Click a slot on the left for everything that "
+                "drops for it, or a row for the stat comparison and who drops it. \"Best upgrades (all slots)\" "
+                "goes back to gear for sale.\n\nOnly gear you can equip at your level is counted as an upgrade. "
+                "Drop chances aren't known, and Blizzard has no stats for many Classic-era items, so some drops "
+                "are missing from this list.")
+
     def show_all(self):
         self.view_slot = None
+        if self.drop_mode:
+            self.drop_mode = False
+            self.set_headings()
         self.gear.tree.selection_remove(*self.gear.tree.selection())
         self.refresh_view()
 
@@ -3077,6 +3301,8 @@ class CharacterTab(ttk.Frame):
             self.refresh_view(keep_detail=True)
 
     def refresh_view(self, keep_detail=False):
+        if self.drop_mode:
+            return self.refresh_drops(keep_detail)
         if not self.char or not self.index:
             return
         mode, weights = self.mode.get(), self.weights()
@@ -3193,7 +3419,15 @@ class CharacterTab(ttk.Frame):
         o.emit(f"{r['slot_name']}: ", "bold")
         o.emit_link(r["name"], wowhead_url(r["id"], game))
         o.emit(f"   item level {r['ilvl']}" + (f", requires {r['req']}" if r.get("req") else "")
-               + f"   for {wp.fmt_gold(r['price'])} ({r['listed']:,} listed)\n")
+               + (f"   for {wp.fmt_gold(r['price'])} ({r['listed']:,} listed)\n" if r["price"] else
+                  "   not on the auction house\n"))
+        for zone, names in (r.get("from") or {}).items():
+            o.emit("Drops from: ", "gold")
+            o.emit(", ".join(names[:6]) + (" ..." if len(names) > 6 else "") + (f"  ·  {zone}" if zone else "") + "   ")
+        if r.get("npcs"):
+            dt = self.app.dungeon_tab
+            o.emit_action("Open in Dungeons tab", lambda: (self.app.tabs.select(dt), dt.goto(r["npcs"][0])))
+            o.emit("\n")
         if not r["usable"]:
             o.emit(f"You can't use this: {r['why']}.\n", "down")
         cf = f"{c['fit'] * 100:.0f}%" if c.get("fit") is not None else "--"
@@ -3250,6 +3484,8 @@ class MonsterTab(ttk.Frame):
     """Monster Compendium: every monster in each region, what it drops (priced on the AH),
     the quests that need it or its drops, and a tracking list with kill counters."""
 
+    TITLE = "Monster Compendium"
+    SIDE_LABEL = "Regions"
     WIKI_CHOICES = ["Wowhead (Forever)", "Warcraft Wiki"]
     FACTIONS = ["Both factions", "Alliance", "Horde"]
 
@@ -3266,9 +3502,10 @@ class MonsterTab(ttk.Frame):
         self.cur_drops = []
         self.tracked = wm.load_tracking()
         self.declined = False
+        self.listeners = []                  # called with an error text (or None) after each load
 
         # --- top bar: search, link choice, data status
-        top = ttk.Frame(self)
+        self.top = top = ttk.Frame(self)
         top.pack(fill="x")
         self.q = ttk.Entry(top, width=26, font=M(11))
         self.q.pack(side="left")
@@ -3317,7 +3554,7 @@ class MonsterTab(ttk.Frame):
         left = ttk.Frame(body, width=250)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
-        ttk.Label(left, text="Regions", font=F(10, "bold"), foreground=GOLD).pack(anchor="w")
+        ttk.Label(left, text=self.SIDE_LABEL, font=F(10, "bold"), foreground=GOLD).pack(anchor="w")
         rbox = ttk.Frame(left)
         rbox.pack(fill="both", expand=True)
         self.rtree = ttk.Treeview(rbox, show="tree", selectmode="browse", style="Side.Treeview")
@@ -3336,7 +3573,7 @@ class MonsterTab(ttk.Frame):
         panes.pack(fill="both", expand=True)
 
         upper = ttk.Frame(panes)
-        bar = ttk.Frame(upper)
+        self.bar = bar = ttk.Frame(upper)
         bar.pack(side="bottom", fill="x", pady=(6, 4))
         self.table = DataTable(upper, [("name", "MONSTER", 200, "w"), ("trk", "TRACKED", 70, "center"),
                                        ("lvl", "LEVEL", 58, "e"), ("rank", "TYPE", 84, "w"),
@@ -3359,24 +3596,27 @@ class MonsterTab(ttk.Frame):
         ttk.Button(bar, text="+1 kill", command=lambda: self.add_kill(1)).pack(side="left", padx=(6, 0))
         ttk.Button(bar, text="-1", width=4, command=lambda: self.add_kill(-1)).pack(side="left", padx=(4, 0))
         ttk.Button(bar, text="Note...", command=self.edit_note).pack(side="left", padx=(6, 0))
+        ttk.Button(bar, text="Copy waypoint", command=self.copy_waypoint).pack(side="left", padx=(6, 0))
         ttk.Button(bar, text="Warcraft Wiki", command=lambda: self.open_link("wiki")).pack(side="right")
         ttk.Button(bar, text="Wowhead", command=lambda: self.open_link("wowhead")).pack(side="right", padx=6)
         panes.add(upper, minsize=170, stretch="always")
 
         lower = ttk.Frame(panes)
-        dleft = ttk.Frame(lower, width=520)
+        dleft = ttk.Frame(lower, width=590)
         dleft.pack(side="left", fill="both")
         dleft.pack_propagate(False)
         dbar = ttk.Frame(dleft)
         dbar.pack(side="bottom", fill="x", pady=(6, 0))
         self.drops = DataTable(dleft, [("item", "DROPS", 180, "w"), ("type", "TYPE", 90, "w"),
                                        ("chance", "CHANCE", 60, "e"), ("price", "AH LOWEST", 98, "e"),
-                                       ("qty", "ON AH", 56, "e")], height=8)
+                                       ("qty", "ON AH", 56, "e"), ("you", "FOR YOU", 72, "e")], height=8)
         self.drops.pack(fill="both", expand=True)
         dtv = self.drops.tree
         for q, col in QUALITY_COLORS.items():
             dtv.tag_configure("q_" + q, foreground=col)
         dtv.tag_configure("questitem", foreground="#ffd100")
+        dtv.tag_configure("better", background="#163a1c")
+        self.stats_tried, self.stats_busy = set(), False
         dtv.bind("<Double-Button-1>", lambda e: self.open_drop())
         self.drops.on_sort = self.sort_drops
         self.drop_sort = None
@@ -3446,6 +3686,8 @@ class MonsterTab(ttk.Frame):
                 self.set_status("")
                 self.info.show("Couldn't load the monster data.\n\n" + (err or "") +
                                "\n\nClick Update data to try again.")
+                for fn in self.listeners:
+                    fn(err or "")
                 return
             self.db = db
             self.set_status("")
@@ -3455,6 +3697,8 @@ class MonsterTab(ttk.Frame):
                 Toast(self.app.root, f"Monster data updated (QuestieDB {db.version})")
             self.load_prices()
             self.check_for_update()
+            for fn in self.listeners:
+                fn(None)
 
         threading.Thread(target=lambda: self.post(done, work()), daemon=True).start()
 
@@ -3595,7 +3839,7 @@ class MonsterTab(ttk.Frame):
         return {"name": n["n"], "trk": "yes" if tr else "", "lvl": "?" if lvl == "0" else lvl,
                 "rank": db.rank_text(nid), "zone": zone, "drops": len(db.drops.get(nid, [])),
                 "quests": len(self.quest_list(nid)), "kills": tr.get("kills", 0) if tr else "",
-                "best": best_txt, "_best": best[1]["lowest"] if best else -1, "_lvl": n["l"][0]}
+                "best": best_txt, "_best": best[1]["lowest"] if best else -1, "_lvl": min(n["l"][0], 99)}
 
     def fill_monsters(self, keep=False):
         if self.db is None or not self.view:
@@ -3695,7 +3939,70 @@ class MonsterTab(ttk.Frame):
         m.add_separator()
         m.add_command(label="Untrack" if self.tracked_entry(self.cur) else "Track",
                       command=self.toggle_track)
+        self.extra_menu(m)
         m.tk_popup(event.x_root, event.y_root)
+
+    def extra_menu(self, m):
+        dt = getattr(self.app, "dungeon_tab", None)
+        zid = dt.dungeon_of(self.cur) if dt else None
+        if zid:
+            nid = self.cur
+            m.add_separator()
+            m.add_command(label="Open in Dungeons tab",
+                          command=lambda: (self.app.tabs.select(dt), dt.goto(nid, zid)))
+
+    def goto(self, nid, zid=None):
+        """Show a monster: open its zone in the side list and select its row."""
+        if self.db is None or nid not in self.db.npcs:
+            return
+        zid = zid or self.db.main_zone(nid)
+        iid = f"z:{zid}"
+        if self.rtree.exists(iid):
+            if self.rtree.parent(iid):
+                self.rtree.item(self.rtree.parent(iid), open=True)
+            self.rtree.selection_set(iid)
+            self.rtree.see(iid)
+
+        def pick():
+            if self.view != ("zone", zid):
+                self.view = ("zone", zid)
+                self.fill_monsters()
+            tv = self.table.tree
+            if str(nid) in tv.get_children():
+                tv.selection_set(str(nid))
+                tv.see(str(nid))
+        self.after(120, pick)                # after the side list's own selection event has run
+
+    def spots(self, nid):
+        """[(label, zone, x, y, note)]: where a monster is, or its dungeon's entrance."""
+        out = [("Where: ", zone, x, y, f"  (busiest of {n} spawn points)" if n > 1 else "")
+               for zone, x, y, n in self.db.where(nid)]
+        dt = getattr(self.app, "dungeon_tab", None)
+        zid = dt.dungeon_of(nid) if dt is not None and not out else None
+        if zid:
+            out = [(f"Entrance to {self.db.zone_name(zid)}: ", zone, x, y, f"  ({label})" if label else "")
+                   for zone, x, y, label in wd.entrances(self.db, zid)[:3]]
+        return out
+
+    def copy_waypoint(self):
+        if self.cur is None or self.db is None:
+            messagebox.showinfo(self.TITLE, "Select a monster in the table first.", parent=self)
+            return
+        spots = self.spots(self.cur)
+        if not spots:
+            messagebox.showinfo(self.TITLE, "There's no map position for this monster in the data.", parent=self)
+            return
+        _l, zone, x, y, _n = spots[0]
+        self.app.copy_way(wm.way(zone, x, y, self.db.npcs[self.cur]["n"]))
+
+    def emit_quest_spot(self, o, qid):
+        """One line under a quest: where its giver stands, with a waypoint link."""
+        spot = self.db.quest_spot(qid)
+        q = self.db.allq.get(qid)
+        if spot and q:
+            o.emit(f"    Starts at {spot[0]} {spot[1]:g}, {spot[2]:g}   ", "muted")
+            o.emit_action("Copy waypoint", lambda: self.app.copy_way(wm.way(*spot, q[wpg.GIVER] or q[wpg.N])))
+            o.emit("\n")
 
     def open_link(self, which):
         if self.cur is None or self.db is None:
@@ -3730,6 +4037,11 @@ class MonsterTab(ttk.Frame):
         zones = sorted(n["z"], key=lambda z: -n["z"][z])
         o.emit("Found in: ", "gold")
         o.emit(", ".join(db.zone_name(z) for z in zones[:8]) + (" ..." if len(zones) > 8 else "") + "\n")
+        for label, zone, x, y, note in self.spots(nid):
+            o.emit(label, "gold")
+            o.emit(f"{zone}  {x:g}, {y:g}{note}   ")
+            o.emit_action("Copy waypoint", lambda z=zone, x=x, y=y: self.app.copy_way(wm.way(z, x, y, n["n"])))
+            o.emit("\n")
         tr = self.tracked_entry(nid)
         if tr:
             o.emit("Tracking: ", "gold")
@@ -3769,21 +4081,48 @@ class MonsterTab(ttk.Frame):
                 o.emit("    Started by an item\n", "muted")
             elif q.get("en"):
                 o.emit(f"    Turn in to {', '.join(q['en'][:2])}\n", "muted")
+            self.emit_quest_spot(o, qid)
             if q.get("t"):
                 o.emit(f"    {q['t'][:220]}\n", "muted")
         o.emit("\nMonster, drop and quest data: QuestieDB (Forever). Drop chances are only known for "
                "quest items; prices are the lowest listing across all Forever auction houses.\n", "muted")
         o.end()
 
+    def my_char(self):
+        """The Forever character loaded on the Character tab, if any."""
+        c = getattr(self.app.char_tab, "char", None)
+        return c if isinstance(c, dict) and c.get("game") == "forever" else None
+
+    def for_me(self, d, char):
+        """("+12%", gain, is an upgrade) for a drop against the loaded character's gear."""
+        if not char or d["cls"] not in ("Weapon", "Armor"):
+            return "", -1e9, False
+        g = wl.gear_of(d["id"])
+        if not g:
+            return ("no data" if g is None else "..."), -1e9, False
+        r = wl.rate(char, g, self.app.char_tab.weights(), self.app.char_tab.mode.get())
+        if not r:
+            return "", -1e9, False
+        if not r["usable"]:
+            return "can't use", -1e8, False
+        if r["same"]:
+            return "wearing", 0, False
+        if r["better"]:
+            return ("new" if r["up_pct"] is None else f"{r['up_pct']:+.0f}%"), r["gain"], True
+        return (f"{r['up_pct']:+.0f}%" if r["up_pct"] is not None else "--"), r["gain"], False
+
     def fill_drops(self):
         tv = self.drops.tree
         tv.delete(*tv.get_children())
         rows = list(self.cur_drops)
+        char = self.my_char()
+        for d in rows:
+            d["_you"] = self.for_me(d, char)
         if self.drop_sort:
             k, rev = self.drop_sort
             keyf = {"item": lambda d: d["name"].lower(), "type": lambda d: d["cls"],
                     "chance": lambda d: d["rate"] or -1, "price": lambda d: d["ah"] or -1,
-                    "qty": lambda d: d["qty"]}[k]
+                    "qty": lambda d: d["qty"], "you": lambda d: d["_you"][1]}[k]
             rows.sort(key=keyf, reverse=rev)
         for d in rows:
             info = wp.cached_info("forever", d["id"])
@@ -3791,9 +4130,25 @@ class MonsterTab(ttk.Frame):
             tag = "questitem" if d["cls"] == "Quest" else ("q_" + q if q in QUALITY_COLORS else "")
             cls = info.get("cls") or d["cls"]
             price = wp.fmt_gold(d["ah"]) if d["ah"] else ("--" if self.sources is not None else "...")
-            tv.insert("", "end", iid=str(d["id"]), tags=(tag,) if tag else (),
+            tags = ((tag,) if tag else ()) + (("better",) if d["_you"][2] else ())
+            tv.insert("", "end", iid=str(d["id"]), tags=tags,
                       values=[d["name"], cls, f"{d['rate']:.0f}%" if d["rate"] else "",
-                              price, d["qty"] or ""])
+                              price, d["qty"] or "", d["_you"][0]])
+        if char:
+            self.want_stats([d["id"] for d in rows if d["cls"] in ("Weapon", "Armor")])
+
+    def want_stats(self, ids):
+        """Ask Blizzard (once, in the background) for the stats of drops it hasn't been asked about."""
+        todo = [i for i in wl.not_asked(ids) if i not in self.stats_tried]
+        if not todo or self.stats_busy or not wp.has_credentials():
+            return
+        self.stats_busy = True
+        self.stats_tried.update(todo)
+
+        def done(_res):
+            self.stats_busy = False
+            self.fill_drops()
+        self.app.in_background(lambda: capture(lambda: wp.fetch_items(wp.connect("forever"), todo)), done)
 
     def sort_drops(self, key):
         rev = not (self.drop_sort and self.drop_sort[0] == key and self.drop_sort[1])
@@ -3805,7 +4160,7 @@ class MonsterTab(ttk.Frame):
     def selected_drop(self):
         sel = self.drops.tree.selection()
         if not sel:
-            messagebox.showinfo("Monster Compendium", "Select a drop in the list first.", parent=self)
+            messagebox.showinfo(self.TITLE, "Select a drop in the list first.", parent=self)
             return None
         iid = int(sel[0])
         return next((d for d in self.cur_drops if d["id"] == iid), None)
@@ -3897,6 +4252,1072 @@ class MonsterTab(ttk.Frame):
         ttk.Button(btns, text="Cancel", command=dlg.destroy).pack(side="right")
         ttk.Button(btns, text="Save", command=save).pack(side="right", padx=6)
         e.bind("<Return>", save)
+
+
+class DungeonTab(MonsterTab):
+    """Dungeons: every Forever dungeon and raid in the monster data, how to get there,
+    the monsters inside, what they drop (priced on the AH) and the quests that send you in.
+    Shares the Monster Compendium's data, prices and tracking list."""
+
+    TITLE = "Dungeons"
+    SIDE_LABEL = "Dungeons and raids"
+    INTRO = ("Dungeons\n\nPick a dungeon or raid on the left to see where its entrance is, the quickest way "
+             "there for each faction, every monster inside, what they drop (priced on the auction house) "
+             "and the quests that send you in.\n\n"
+             "Click a monster for its own drops and quests; Dungeon overview brings the dungeon page back. "
+             "Search above looks through dungeon monsters only.\n\n"
+             "Monsters, drops, quests and entrance coordinates: QuestieDB (the Questie addon's community "
+             "database). Travel routes are this app's own notes, written from Classic-era geography and not "
+             "yet checked in Forever. Edit routes (top right) opens the notes file so you can correct them.")
+
+    def __init__(self, master, app):
+        super().__init__(master, app)
+        self.mt = app.monster_tab
+        self.tracked = self.mt.tracked           # one tracking list for both tabs
+        self.zone = None                         # selected dungeon's area id
+        self.dmap = {}                           # area id -> dungeon dict
+        self.dnpcs = set()                       # every monster that lives in a dungeon
+        self.mt.listeners.append(self.adopt)
+        ttk.Button(self.top, text="Edit routes...", command=self.edit_routes).pack(side="right", padx=(0, 6))
+        ttk.Button(self.bar, text="Dungeon overview", command=self.show_overview).pack(side="left", padx=(12, 0))
+        ttk.Button(self.bar, text="Open in Monster Compendium",
+                   command=self.to_compendium).pack(side="left", padx=(6, 0))
+        self.info.show(self.INTRO)
+
+    # ------------------------------------------------------------ loading (the Compendium owns the data)
+    def load(self, update=False):
+        mt = self.mt
+        if mt.db is not None and not update:
+            self.adopt()
+            return
+        if mt.loading:
+            return
+        if self.db is None:
+            self.info.show("Loading dungeon data...")
+        mt.load(update=update)
+        if mt.loading:
+            return
+        if mt.db is None:                        # the download was declined
+            self.declined = True
+            self.info.show("Dungeons\n\nThe dungeon data hasn't been downloaded yet. It is the same QuestieDB "
+                           "download the Monster Compendium uses (about 14 MB, one time).\n\n"
+                           "Click Update data (top right) when you're ready.")
+        elif self.db is None:
+            self.adopt()
+
+    def adopt(self, err=None):
+        mt = self.mt
+        if mt.db is None:
+            if not self.declined:
+                self.info.show("Couldn't load the dungeon data.\n\n" + (err or "") +
+                               "\n\nClick Update data to try again.")
+            return
+        self.declined = False
+        self.db = mt.db
+        self.fill_regions()
+        self.update_data_label()
+        if wp.has_credentials():
+            self.load_prices()
+        else:
+            self.set_status("No Blizzard API key saved yet, so drops have no auction house prices.")
+
+    def update_data_label(self, newer=None):
+        self.data_label.config(text=f"QuestieDB {self.db.version} · {len(self.dmap)} dungeons and raids",
+                               foreground=MUTED)
+
+    def load_prices(self, force=False):
+        mt = self.mt
+        if not force and mt.sources is not None and time.time() - mt.sources_ts < PRICE_TTL:
+            if self.sources is not mt.sources:
+                self.sources, self.sources_ts = mt.sources, mt.sources_ts
+                self.set_status(f"AH prices from {clock(self.sources_ts)}")
+                self.fill_monsters(keep=True)
+                self.show_detail()
+            return
+        super().load_prices(force)
+
+    # ------------------------------------------------------------ dungeon list
+    def fill_regions(self):
+        t = self.rtree
+        t.delete(*t.get_children())
+        self.dmap, self.dnpcs = {}, set()
+        for group, lst in wd.dungeon_list(self.db):
+            g = t.insert("", "end", iid="g:" + group, text=group, open=True, tags=("group",))
+            for d in lst:
+                self.dmap[d["id"]] = d
+                self.dnpcs.update(self.db.by_zone.get(d["id"], []))
+                lv = d["levels"]
+                t.insert(g, "end", iid=f"z:{d['id']}", text=d["name"] + (f"  ({lv[0]}-{lv[1]})" if lv else ""))
+        self.zone = self.view = self.cur = None
+        self.cur_drops = []
+        for tv in (self.table.tree, self.drops.tree):
+            tv.delete(*tv.get_children())
+        self.info.show(self.INTRO)
+
+    def on_region(self, _e=None):
+        sel = self.rtree.selection()
+        if not sel or self.db is None or not sel[0].startswith("z:"):
+            return
+        self.zone = int(sel[0][2:])
+        self.view = ("zone", self.zone)
+        self.fill_monsters()
+
+    def view_ids(self):
+        ids = super().view_ids()
+        if self.view and self.view[0] == "search":
+            ids = [n for n in ids if n in self.dnpcs]
+        return ids
+
+    def fill_monsters(self, keep=False):
+        super().fill_monsters(keep)
+        if not keep and self.view and self.view[0] == "zone":
+            self.show_overview()                 # a dungeon opens on its own page, not its first monster
+
+    def dungeon_of(self, nid):
+        """The dungeon a monster lives in (area id), or None."""
+        if self.db is None and self.mt.db is not None:
+            self.adopt()
+        if self.db is None or nid not in self.db.npcs:
+            return None
+        z = self.db.npcs[nid]["z"]
+        return next((k for k in sorted(z, key=lambda k: -z[k]) if k in self.dmap), None)
+
+    def open_dungeon(self, zid):
+        """Show a dungeon's page (used by the Progress tab)."""
+        if self.db is None and self.mt.db is not None:
+            self.adopt()
+        iid = f"z:{zid}"
+        if self.db is not None and self.rtree.exists(iid):
+            self.rtree.selection_set(iid)
+            self.rtree.see(iid)
+            self.zone, self.view = zid, ("zone", zid)
+            self.fill_monsters()
+
+    def goto(self, nid, zid=None):
+        zid = zid or self.dungeon_of(nid)
+        if zid:
+            self.zone = zid
+            super().goto(nid, zid)
+
+    # ------------------------------------------------------------ dungeon page
+    def show_detail(self):
+        if self.cur is None and self.view and self.view[0] == "zone":
+            self.show_overview()
+        else:
+            super().show_detail()
+
+    def show_overview(self):
+        if self.db is None or self.zone not in self.dmap:
+            return
+        tv = self.table.tree
+        if tv.selection():
+            tv.selection_remove(tv.selection())
+        self.cur = None
+        self.btn_track.config(text="Track")
+        db, zid, d = self.db, self.zone, self.dmap[self.zone]
+        t = wd.load_travel().get(zid) or {}
+
+        self.cur_drops = wd.dungeon_drops(db, zid)
+        for x in self.cur_drops:
+            s = wp.item_summary(self.sources, x["id"]) if self.sources is not None else None
+            x["ah"], x["qty"] = (s["lowest"], s["quantity"]) if s else (None, 0)
+        self.cur_drops.sort(key=lambda x: (-(x["ah"] or 0), x["cls"] != "Quest", x["name"]))
+        self.fill_drops()
+
+        o = self.info
+        o.begin()
+        o.emit_link(d["name"], wiki_url(d["name"]), "gold", "bold")
+        o.emit("\n")
+        kind = (t.get("kind") or "").lower()
+        bits = ["Raid" if kind == "raid" else "Dungeon" if kind == "dungeon" else "Type not recorded"]
+        if t.get("players"):
+            bits.append(f"{t['players']} players")
+        if d["levels"]:
+            bits.append(f"monsters level {d['levels'][0]}-{d['levels'][1]}")
+        bits.append(f"{d['count']} monsters · {len(self.cur_drops)} drops")
+        o.emit("  ·  ".join(bits) + "\n", "muted")
+
+        o.emit("\nHow to get there\n", "gold", "bold")
+        ents = wd.entrances(db, zid)
+        for zone, x, y, label in ents:
+            o.emit("Entrance: ", "gold")
+            o.emit(f"{zone}  {x:g}, {y:g}" + (f"  ({label})" if label else "") + "   ")
+            o.emit_action("Copy waypoint", lambda z=zone, x=x, y=y: self.app.copy_way(wm.way(z, x, y, d["name"])))
+            o.emit("\n")
+        if not ents:
+            o.emit("Entrance location isn't in the data yet.\n", "muted")
+        f = self.faction.current()
+        sides = [("alliance", "Alliance"), ("horde", "Horde")]
+        sides = sides[:1] if f == 1 else sides[1:] if f == 2 else sides
+        any_route = False
+        for key, label in sides:
+            flight, steps = wd.route(t, key)
+            o.emit(f"\n{label}\n", "gold")
+            if not steps:
+                o.emit("Route not recorded yet.\n", "muted")
+                continue
+            any_route = True
+            if flight:
+                o.emit(f"Nearest flight point: {flight}\n")
+            for i, s in enumerate(steps, 1):
+                o.emit(f"{i}. {s}\n")
+        if t.get("notes"):
+            o.emit(f"\n{t['notes']}\n", "muted")
+        if any_route and not t.get("verified"):
+            o.emit("\nRoute written from Classic-era geography and not yet checked in Forever. "
+                   "Edit routes (top right) to correct it.\n", "muted")
+        elif not any_route:
+            o.emit("\nKnow the way? Edit routes (top right) opens the notes file.\n", "muted")
+
+        quests = [q for q in wd.dungeon_quests(db, zid) if self.faction_ok(q[1])]
+        o.emit(f"\nQuests for this dungeon ({len(quests)})\n", "gold", "bold")
+        if not quests:
+            o.emit("None known" + (" for this faction" if f else "") + ".\n", "muted")
+        for qid, q, why in quests:
+            lv = q.get("lv")
+            o.emit(f"[{lv if lv and lv > 0 else '?'}] ", "muted")
+            o.emit_link(q["n"], wm.WOWHEAD_QUEST.format(qid))
+            o.emit({"A": "  Alliance", "H": "  Horde"}.get(q.get("fa"), "") + "\n", "muted")
+            if why:
+                o.emit("    " + "; ".join(why) + "\n", "up")
+            if q.get("sn"):
+                o.emit(f"    From {', '.join(q['sn'][:2])}", "muted")
+                if q.get("en") and q["en"] != q["sn"]:
+                    o.emit(f"  ·  turn in to {', '.join(q['en'][:2])}", "muted")
+                o.emit("\n")
+            elif q.get("si"):
+                o.emit("    Started by an item\n", "muted")
+            elif q.get("en"):
+                o.emit(f"    Turn in to {', '.join(q['en'][:2])}\n", "muted")
+            self.emit_quest_spot(o, qid)
+            if q.get("t"):
+                o.emit(f"    {q['t'][:220]}\n", "muted")
+        o.emit("\nThe list on the left of this text shows everything dropped inside, most valuable first. "
+               "Click a monster above for its own drops and quests.\n" +
+               ("FOR YOU compares each piece of gear with what " + self.my_char()["name"] + " wears; green rows "
+                "are upgrades. Click that heading to sort by it.\n" if self.my_char() else
+                "Look up a character on the Character tab and FOR YOU will show which drops are upgrades.\n") +
+               "Monsters, drops, quests and entrance coordinates: QuestieDB (Forever). Drop chances are only "
+               "known for quest items.\n", "muted")
+        o.end()
+
+    # ------------------------------------------------------------ links to the Compendium, routes file
+    def extra_menu(self, m):
+        m.add_separator()
+        m.add_command(label="Open in Monster Compendium", command=self.to_compendium)
+
+    def copy_waypoint(self):
+        if self.cur is None and self.db is not None and self.zone in self.dmap:
+            ents = wd.entrances(self.db, self.zone)
+            if ents:
+                self.app.copy_way(wm.way(ents[0][0], ents[0][1], ents[0][2], self.dmap[self.zone]["name"]))
+                return
+        super().copy_waypoint()
+
+    def to_compendium(self):
+        if self.cur is None:
+            messagebox.showinfo(self.TITLE, "Select a monster in the table first.", parent=self)
+            return
+        self.app.tabs.select(self.mt)
+        self.mt.goto(self.cur)
+
+    def save_tracking(self):
+        super().save_tracking()
+        mt = self.mt
+        if mt.rtree.exists("tracked"):
+            mt.rtree.item("tracked", text=mt.tracked_label())
+        if mt.db is not None and mt.view:
+            mt.fill_monsters(keep=True)
+
+    def edit_routes(self):
+        path = wd.USER_PATH
+        try:
+            path = wd.editable_path()
+            os.startfile(path)
+        except (OSError, AttributeError):
+            messagebox.showinfo(self.TITLE, f"The travel notes are in this file:\n\n{path}\n\n"
+                                "Open it in Notepad to edit the routes.", parent=self)
+            return
+        self.set_status("Save the file, then pick the dungeon again to see your changes.")
+
+
+class ProgressTab(ttk.Frame):
+    """Progress: one Forever character's quests per zone, current quests, milestones,
+    reputations, PvP, dungeons and raids, professions - and what to do next."""
+
+    TITLE = "Progress"
+    SECTIONS = [("next", "What to do next"), ("route", "Tonight's route"), ("zones", "Zones"), ("log", "Quest log"),
+                ("miles", "Milestones"), ("reps", "Reputations"), ("pvp", "PvP"),
+                ("raids", "Dungeons and raids"), ("profs", "Professions"), ("stats", "All statistics"),
+                ("chars", "My characters")]
+    HEADS = {"next": [("Quest", 230), ("Level", 54), ("Zone", 150), ("From", 150), ("Why", 190)],
+             "route": [("Stop", 50), ("Where", 110), ("What to do", 470), ("Quests", 70), ("", 20)],
+             "zones": [("Zone", 230), ("Done", 80), ("For you now", 96), ("Progress", 84), ("Quest levels", 100)],
+             "log": [("Quest", 250), ("Level", 54), ("Zone", 170), ("Turn in to", 180), ("", 60)],
+             "miles": [("Milestone", 280), ("Status", 100), ("Progress", 90), ("Completed", 120), ("", 60)],
+             "reps": [("Faction", 240), ("Standing", 110), ("Progress", 130), ("To next", 100), ("", 60)],
+             "pvp": [("Statistic", 300), ("Value", 110), ("Detail", 170), ("Group", 150), ("", 20)],
+             "raids": [("Dungeon or raid", 230), ("Type", 80), ("Quests done", 100), ("Bosses down", 110),
+                       ("Monster levels", 110)],
+             "profs": [("Profession", 240), ("Skill", 80), ("Cap", 80), ("Recipes known", 120), ("", 60)],
+             "stats": [("Statistic", 300), ("Value", 110), ("Detail", 170), ("Group", 170), ("", 20)],
+             "chars": [("Character", 190), ("Level and class", 190), ("Quests done", 96), ("Professions", 280),
+                       ("Read from Blizzard", 150)]}
+    INTRO = ("Progress\n\nType your WoW: Forever character's first name and surname above and click Load.\n\n"
+             "The app reads the character's progress from Blizzard (completed and current quests, milestones, "
+             "reputations, PvP, dungeon and raid kills, professions) and compares it with the full quest list "
+             "to show how far along each zone is and what to do next.\n\n"
+             "Forever characters appear from level 10, after you log out. Blizzard updates a character's data "
+             "when it logs out, so load again after a play session.")
+
+    def __init__(self, master, app):
+        super().__init__(master, padding=8)
+        self.app = app
+        self.mt = app.monster_tab
+        self.snap = None
+        self.pg = None                       # wpg.Progress once the quest list is loaded too
+        self.zone_rows, self.rec, self.route = [], None, None
+        self.section = "next"
+        self.rows = {}                       # table row id -> what it stands for
+        self.cur_quest = None
+        self.started = False
+        self.mt.listeners.append(lambda err=None: self.rebuild())
+
+        top = ttk.Frame(self)
+        top.pack(fill="x")
+        ttk.Label(top, text="First name").pack(side="left")
+        self.name = ttk.Entry(top, width=14, font=M(11))
+        self.name.pack(side="left", padx=(6, 10))
+        ttk.Label(top, text="Surname").pack(side="left")
+        self.second = ttk.Entry(top, width=14, font=M(11))
+        self.second.pack(side="left", padx=(6, 8))
+        for e in (self.name, self.second):
+            e.bind("<Return>", lambda ev: self.load())
+        self.btn_load = ttk.Button(top, text="Load", command=self.load)
+        self.btn_load.pack(side="left")
+        ttk.Label(top, text="Recent").pack(side="left", padx=(14, 4))
+        self.recent = ttk.Combobox(top, state="readonly", width=22)
+        self.recent.pack(side="left")
+        self.recent.bind("<<ComboboxSelected>>", self.pick_recent)
+        ttk.Button(top, text="Guild crafters", command=self.app.open_guild).pack(side="right")
+        self.status = ttk.Label(top, foreground=MUTED, font=M(10))
+        self.status.pack(side="right", padx=(0, 8))
+        self.title = ttk.Label(self, font=F(12, "bold"), foreground=GOLD)
+        self.title.pack(anchor="w", pady=(8, 0))
+        self.sub = ttk.Label(self, foreground=MUTED, font=M(10))
+        self.sub.pack(anchor="w", pady=(0, 6))
+
+        body = ttk.Frame(self)
+        body.pack(fill="both", expand=True)
+        left = ttk.Frame(body, width=210)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
+        ttk.Label(left, text="Track", font=F(10, "bold"), foreground=GOLD).pack(anchor="w")
+        self.side = ttk.Treeview(left, show="tree", selectmode="browse", style="Side.Treeview")
+        self.side.pack(fill="both", expand=True)
+        for key, label in self.SECTIONS:
+            self.side.insert("", "end", iid=key, text=label)
+        self.side.bind("<<TreeviewSelect>>", self.on_section)
+        self.side.bind("<ButtonRelease-1>", self.on_side_click)     # click the open section again to get its page back
+
+        right = ttk.Frame(body)
+        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        panes = tk.PanedWindow(right, orient="vertical", bg=BG, sashwidth=6, bd=0, sashrelief="flat")
+        panes.pack(fill="both", expand=True)
+        upper = ttk.Frame(panes)
+        self.table = DataTable(upper, [(f"c{i}", "", 120, "w") for i in range(1, 6)], height=10)
+        self.table.pack(fill="both", expand=True)
+        tv = self.table.tree
+        tv.tag_configure("done", foreground=UP)
+        tv.tag_configure("now", foreground=GOLD)
+        tv.tag_configure("link", foreground=LINK)
+        tv.bind("<<TreeviewSelect>>", lambda e: self.on_row())
+        tv.bind("<Double-Button-1>", self.on_double)
+        panes.add(upper, minsize=150, stretch="always")
+        lower = ttk.Frame(panes)
+        self.info = OutputText(lower)
+        self.info.config(wrap="word")
+        self.info.pack(fill="both", expand=True, pady=(6, 0))
+        panes.add(lower, minsize=220, stretch="always")
+        self.info.show(self.INTRO)
+        self.bind("<Map>", lambda e: self.on_show())
+
+    # ------------------------------------------------------------ loading
+    def on_show(self):
+        self.refresh_recent()
+        if self.started:
+            return
+        self.started = True
+        saved = wpg.load_saved()
+        snap = saved["chars"].get(saved.get("last") or "")
+        if snap:
+            set_entry(self.name, snap.get("name", ""))
+            set_entry(self.second, snap.get("surname", ""))
+            self.adopt(snap)
+        elif self.recent_list:
+            set_entry(self.name, self.recent_list[0]["name"])
+            set_entry(self.second, self.recent_list[0].get("surname", ""))
+
+    def refresh_recent(self):
+        seen, lst = set(), []
+        saved = wpg.load_saved()["chars"].values()
+        for c in list(saved) + [c for c in wp.load_characters() if c.get("game") == "forever"]:
+            k = (c.get("name", "").lower(), (c.get("surname") or "").lower())
+            if c.get("name") and k not in seen:
+                seen.add(k)
+                lst.append(c)
+        self.recent_list = lst
+        self.recent.config(values=[f"{c['name']} {c.get('surname') or ''}".strip() for c in lst])
+
+    def pick_recent(self, _e=None):
+        c = self.recent_list[self.recent.current()]
+        set_entry(self.name, c["name"])
+        set_entry(self.second, c.get("surname") or "")
+        saved = wpg.load_saved()["chars"].get(f"{c['name']} {c.get('surname') or ''}".strip().lower())
+        if saved:
+            self.adopt(saved)
+        else:
+            self.load()
+
+    def load(self):
+        name, second = self.name.get().strip(), self.second.get().strip()
+        if not name:
+            self.status.config(text="Type the character's first name and surname.")
+            return
+        if not wp.has_credentials():
+            self.status.config(text="Add your Blizzard API key first (restart the app to enter it).")
+            return
+        self.btn_load.config(state="disabled")
+        self.status.config(text=f"Loading {name} {second}...")
+
+        def work():
+            try:
+                return wpg.fetch(name, second or None)
+            except wp.ApiError as e:
+                if e.code == 404:
+                    raise SystemExit(f"Couldn't find {name} {second}. Forever characters need first name AND "
+                                     "surname, must be level 10+, and appear after you log out.")
+                raise
+
+        def done(res):
+            snap, err = res
+            self.btn_load.config(state="normal")
+            if not snap:
+                self.status.config(text=(err or "Couldn't load the character.").splitlines()[-1])
+                return
+            wpg.save(snap)
+            wp.remember_character({"name": snap["name"], "surname": snap.get("surname", ""), "realm": "",
+                                   "game": "forever"})
+            self.refresh_recent()
+            self.adopt(snap)
+
+        self.app.in_background(lambda: capture(work), done)
+
+    def adopt(self, snap):
+        self.snap = snap
+        full = f"{snap['name']} {snap.get('surname', '')}".strip()
+        self.title.config(text=full)
+        bits = [f"Level {snap.get('level', '?')} {snap.get('race', '')} {snap.get('cls', '')}".replace("  ", " "),
+                "Horde" if snap.get("faction") == "H" else "Alliance"]
+        if snap.get("guild"):
+            bits.append(f"<{snap['guild']}>")
+        bits.append(f"{len(snap.get('completed') or [])} quests completed")
+        bits.append(f"read from Blizzard {clock(snap.get('fetched', 0), '%b %d, %I:%M %p')}")
+        self.sub.config(text="  ·  ".join(bits))
+        self.status.config(text="")
+        if self.mt.db is None and not self.mt.loading and not self.mt.declined:
+            self.mt.load()                   # the quest list is the Monster Compendium's data
+        self.rebuild()
+
+    def rebuild(self):
+        if self.snap is None:
+            return
+        self.pg = wpg.Progress(self.mt.db, self.snap) if self.mt.db is not None else None
+        self.zone_rows = self.pg.zones() if self.pg else []
+        self.rec = self.pg.recommend(self.zone_rows) if self.pg else None
+        if self.side.selection() != (self.section,):
+            self.side.selection_set(self.section)
+        self.show_section()
+
+    # ------------------------------------------------------------ sections
+    def on_section(self, _e=None):
+        sel = self.side.selection()
+        if sel and sel[0] != self.section:
+            self.section = sel[0]
+            self.show_section()
+
+    def on_side_click(self, event):
+        if self.side.identify_row(event.y) == self.section and self.table.tree.selection():
+            self.show_section()
+
+    def set_rows(self, rows):
+        """rows: [(row id, [5 values], tag, payload)]"""
+        tv = self.table.tree
+        heads = self.HEADS[self.section]
+        for i, (text, width) in enumerate(heads, 1):
+            tv.heading(f"c{i}", text=text.upper())
+            tv.column(f"c{i}", width=width)
+        tv.delete(*tv.get_children())
+        self.rows = {}
+        self.cur_quest = None
+        for iid, vals, tag, payload in rows:
+            tv.insert("", "end", iid=str(iid), values=list(vals) + [""] * (5 - len(vals)),
+                      tags=(tag,) if tag else ())
+            self.rows[str(iid)] = payload
+
+    def need_quests(self):
+        """False (with a message) when the quest list isn't loaded."""
+        if self.pg is not None:
+            return True
+        self.set_rows([])
+        self.info.show("This part needs the quest list, which is the Monster Compendium's QuestieDB download "
+                       "(about 14 MB, one time).\n\nOpen the Monster Compendium tab and click Update data, "
+                       "then come back." if not self.mt.loading else "Loading the quest list...")
+        return False
+
+    def show_section(self):
+        if self.snap is None:
+            return
+        getattr(self, "sec_" + self.section)()
+
+    def qrow(self, qid, why="", zone=None):
+        q = self.pg.db.allq.get(qid)
+        if not q:
+            return None
+        return (f"q{qid}", [q[wpg.N], q[wpg.LV] if q[wpg.LV] > 0 else "?", zone or self.pg.zone_name(q),
+                            q[wpg.GIVER], why], "link", ("quest", qid))
+
+    def sec_next(self):
+        if not self.need_quests():
+            return
+        r, pg, s = self.rec, self.pg, self.snap
+        rows = []
+        for qid, name in r["finish"]:
+            rows.append(self.qrow(qid, "In your quest log") or
+                        (f"q{qid}", [name, "?", "", "", "In your quest log"], "link", ("quest", qid)))
+        for qid, zone in r["quests"]:
+            lv = pg.db.allq[qid][wpg.LV]
+            rows.append(self.qrow(qid, "At your level" if abs(lv - pg.level) <= 2 else
+                                  "A little below you" if lv < pg.level else "A little above you", zone))
+        self.set_rows([x for x in rows if x])
+        o = self.info
+        o.begin()
+        o.emit("What to do next\n", "gold", "bold")
+        n = 0
+        if r["finish"]:
+            n += 1
+            o.emit(f"\n{n}. Finish what's in your quest log\n", "gold")
+            for qid, name in r["finish"]:
+                o.emit("    ")
+                o.emit_link(name or f"Quest {qid}", wm.WOWHEAD_QUEST.format(qid))
+                q = pg.db.quests.get(qid)
+                o.emit((f"  ·  turn in to {', '.join(q['en'][:2])}" if q and q.get("en") else "") + "\n", "muted")
+        z = r["zone"]
+        if z:
+            n += 1
+            o.emit(f"\n{n}. Quest in {z['name']}\n", "gold")
+            o.emit(f"    {z['now']} quests there are open to you right now and still worth experience "
+                   f"(quest levels {z['lo']}-{z['hi']}). You've done {z['done']} of {z['total']}.\n")
+            o.emit("    The table above lists them, closest to your level first.\n", "muted")
+        elif pg.level:
+            n += 1
+            o.emit(f"\n{n}. No open quests found at your level\n", "gold")
+            o.emit("    The quest list has nothing new you can pick up right now. Dungeons, professions or "
+                   "the next level may open more.\n", "muted")
+        for z2 in r["nearly"]:
+            n += 1
+            o.emit(f"\n{n}. Finish off {z2['name']}\n", "gold")
+            o.emit(f"    {z2['done']} of {z2['total']} done, {z2['now']} still open to you.\n")
+        fits = r["dungeons"]
+        if fits:
+            n += 1
+            o.emit(f"\n{n}. Dungeons around your level\n", "gold")
+            for d in fits:
+                lv = d["levels"]
+                o.emit(f"    {d['name']}", "bold")
+                o.emit(f"  ·  monsters level {lv[0]}-{lv[1]}  ·  quests {d['done']}/{d['total']} done"
+                       + (f", {len(d['now'])} you can pick up before a run" if d["now"] else "") + "\n")
+            o.emit("    Double-click a dungeon under Dungeons and raids for its entrance and route.\n", "muted")
+        profs = [p for p in r["profs"] if p["skill"] < p["max"]]
+        capped = [p for p in r["profs"] if p["skill"] >= p["max"]]
+        if profs or capped:
+            n += 1
+            o.emit(f"\n{n}. Professions\n", "gold")
+            for p in profs:
+                o.emit(f"    {p['name']} {p['skill']}/{p['max']}\n")
+            for p in capped:
+                o.emit(f"    {p['name']} {p['skill']}/{p['max']}  ·  at the cap for this rank; see a trainer "
+                       "for the next one\n")
+            o.emit("    The Professions button has a priced leveling guide for each.\n", "muted")
+        if r["reps"]:
+            n += 1
+            o.emit(f"\n{n}. Reputations close to the next standing\n", "gold")
+            for rp in r["reps"]:
+                o.emit(f"    {rp['name']}: {rp['standing']} {rp['value']}/{rp['max']} "
+                       f"({rp['max'] - rp['value']} to go)\n")
+        if r["milestones"]:
+            n += 1
+            o.emit(f"\n{n}. Milestones in progress\n", "gold")
+            for a in r["milestones"]:
+                o.emit(f"    {a['name']}  ·  progress {a['amount']}\n")
+        o.emit("\nHow this is worked out: quests you haven't done, that your faction and class can take, "
+               "whose required level and earlier quests you've met, and that aren't so far below you that "
+               "they give no experience. The quest list is QuestieDB's, which is still filling in for "
+               "Forever, so some quests may be missing or listed too early.\n", "muted")
+        if pg.unknown_done:
+            o.emit(f"{pg.unknown_done} of your completed quests aren't in the quest list (hidden or brand-new "
+                   "quests) and aren't counted in zone progress.\n", "muted")
+        if s.get("missing"):
+            o.emit("Blizzard didn't return: " + ", ".join(s["missing"]) + ".\n", "muted")
+        o.end()
+
+    # ------------------------------------------------------------ tonight's route
+    @staticmethod
+    def stop_summary(stop):
+        gets = [t for k, t, _q in stop["acts"] if k == "get"]
+        dos = [t for k, t, _q in stop["acts"] if k == "do"]
+        ends = [t for k, t, _q in stop["acts"] if k == "end"]
+        parts = []
+        if ends:
+            parts.append(f"Turn in {len(ends)}" if len(ends) > 1 else ends[0])
+        if gets:
+            parts.append(f"Pick up {len(gets)}" if len(gets) > 1 else gets[0])
+        if dos:
+            parts.append(dos[0].split(" for ")[0] + (f" +{len(dos) - 1} more" if len(dos) > 1 else ""))
+        return "  ·  ".join(parts)
+
+    def stop_way(self, i):
+        r = self.route
+        s = r["stops"][i]
+        return wm.way(r["zone"], s["x"], s["y"], f"Stop {i + 1}: {self.stop_summary(s)}"[:70])
+
+    def copy_route(self):
+        lines = [self.stop_way(i) for i in range(len(self.route["stops"]))]
+        self.app.root.clipboard_clear()
+        self.app.root.clipboard_append("\n".join(lines))
+        Toast(self.app.root, f"Copied {len(lines)} waypoints. In game, TomTom's /ttpaste window takes them all "
+                             "at once (if your TomTom has it); otherwise use Copy waypoint on each stop.")
+
+    def emit_stop(self, o, i, links=False):
+        r, s = self.route, self.route["stops"][i]
+        o.emit(f"\n{i + 1}. ", "gold", "bold")
+        o.emit(f"{r['zone']}  {s['x']:g}, {s['y']:g}   ", "gold")
+        o.emit_action("Copy waypoint", lambda: self.app.copy_way(self.stop_way(i)))
+        o.emit("\n")
+        for kind, text, _q in s["acts"]:
+            o.emit(f"    {text}\n", *({"get": ("gold",), "end": ("up",)}.get(kind, ())))
+        if links:
+            o.emit("\nQuests at this stop: ", "muted")
+            for n, qid in enumerate(dict.fromkeys(q for _k, _t, q in s["acts"])):
+                o.emit(", " if n else "")
+                o.emit_link(self.pg.db.allq[qid][wpg.N], wm.WOWHEAD_QUEST.format(qid))
+            o.emit("\n")
+
+    def sec_route(self):
+        if not self.need_quests():
+            return
+        r = self.route = self.pg.route(self.zone_rows)
+        rows = [(f"s{i}", [i + 1, f"{s['x']:g}, {s['y']:g}", self.stop_summary(s),
+                           len({q for _k, _t, q in s["acts"]})],
+                 "now" if any(k == "get" for k, _t, _q in s["acts"]) else "", ("stop", i))
+                for i, s in enumerate(r["stops"])]
+        self.set_rows(rows)
+        o = self.info
+        o.begin()
+        o.emit("Tonight's route" + (f": {r['zone']}" if r["zone"] else "") + "\n", "gold", "bold")
+        if not r["stops"]:
+            o.emit("\nNo route could be built: the quests open to you have no map positions in the data.\n", "muted")
+        else:
+            o.emit(f"{r['quests']} quests in {len(r['stops'])} stops, nearest first. Gold lines are pick-ups, "
+                   "green lines are turn-ins.   ", "muted")
+            o.emit_action("Copy all waypoints", self.copy_route)
+            o.emit("\n")
+        for i in range(len(r["stops"])):
+            self.emit_stop(o, i)
+        if r["elsewhere"]:
+            o.emit("\nOn another map\n", "gold", "bold")
+            for text, zone, x, y, _q in r["elsewhere"]:
+                o.emit(f"    {text}  ·  {zone} {x:g}, {y:g}   ")
+                o.emit_action("Copy waypoint", lambda z=zone, x=x, y=y, t=text: self.app.copy_way(wm.way(z, x, y, t[:60])))
+                o.emit("\n")
+        if r["unknown"]:
+            o.emit("\nNo location in the data (use your quest log or Questie for these)\n", "gold", "bold")
+            for text, _q in r["unknown"]:
+                o.emit(f"    {text}\n", "muted")
+        fits = [d for d in self.rec["dungeons"]] if self.rec else []
+        if fits:
+            o.emit("\nAfter that\n", "gold", "bold")
+            for d in fits[:3]:
+                o.emit(f"    {d['name']}  ·  quests {d['done']}/{d['total']} done"
+                       + (f", {len(d['now'])} to pick up first" if d["now"] else "") + "   ")
+                ents = wd.entrances(self.pg.db, d["id"])
+                if ents:
+                    o.emit_action("Copy waypoint to the entrance", lambda e=ents[0], n=d["name"]:
+                                  self.app.copy_way(wm.way(e[0], e[1], e[2], n)))
+                o.emit("\n")
+        o.emit("\nHow this is built: the quests in your log plus the ten open quests closest to your level in "
+               "the suggested zone. Each stop is a quest giver, a monster's busiest spawn point or a turn-in, "
+               "taken nearest-first, never an objective before its pick-up. It doesn't know about roads, cliffs "
+               "or flight paths, or which objectives you've already finished. Click a stop for its quests; "
+               "double-click to copy its waypoint.\n", "muted")
+        o.end()
+
+    def sec_zones(self):
+        if not self.need_quests():
+            return
+        rows = []
+        for i, z in enumerate(self.zone_rows):
+            pct = round(100 * z["done"] / z["total"]) if z["total"] else 0
+            tag = "done" if z["total"] and z["done"] == z["total"] else "now" if z["now"] else ""
+            rows.append((f"z{i}", [z["name"], f"{z['done']} / {z['total']}", z["now"] or "",
+                                   f"{bar(pct, 100, 8)} {pct}%", f"{z['lo']}-{z['hi']}" if z["hi"] else ""],
+                         tag, ("zone", z)))
+        self.set_rows(rows)
+        done = sum(z["done"] for z in self.zone_rows)
+        total = sum(z["total"] for z in self.zone_rows)
+        self.info.show(f"Zones\n\n{done} of {total} quests done across {len(self.zone_rows)} zones, counting "
+                       "only quests your faction and class can take. Repeatable quests aren't counted.\n\n"
+                       "\"For you now\" is how many you can pick up today that still give experience. Zones "
+                       "with the most of those are listed first.\n\nClick a zone to see what's left in it.")
+
+    def zone_detail(self, z):
+        pg, o = self.pg, self.info
+        o.begin()
+        o.emit(z["name"] + "\n", "gold", "bold")
+        o.emit(f"{z['done']} of {z['total']} quests done  ·  quest levels {z['lo']}-{z['hi']}\n", "muted")
+        groups = [("now", "Open to you now"), ("active", "In your quest log"),
+                  ("later", "Later (higher level or an earlier quest first)"),
+                  ("gray", "Below your level (no experience)"), ("done", "Done")]
+        by = {}
+        for qid in z["ids"]:
+            by.setdefault(pg.state(qid), []).append(qid)
+        for key, label in groups:
+            ids = sorted(by.get(key, []), key=lambda q: (pg.db.allq[q][wpg.LV], pg.db.allq[q][wpg.N]))
+            if not ids:
+                continue
+            o.emit(f"\n{label} ({len(ids)})\n", "gold")
+            for qid in ids[:60]:
+                q = pg.db.allq[qid]
+                o.emit(f"[{q[wpg.LV] if q[wpg.LV] > 0 else '?'}] ", "muted")
+                o.emit_link(q[wpg.N], wm.WOWHEAD_QUEST.format(qid))
+                extra = []
+                if key in ("now", "later") and q[wpg.GIVER]:
+                    extra.append(f"from {q[wpg.GIVER]}")
+                if key == "later":
+                    extra += pg.blockers(qid)
+                o.emit(("  ·  " + "  ·  ".join(extra) if extra else "") + "\n", "muted")
+            if len(ids) > 60:
+                o.emit(f"... and {len(ids) - 60} more\n", "muted")
+        o.end()
+
+    def sec_log(self):
+        s, pg = self.snap, self.pg
+        rows = []
+        for qid, name in s.get("in_progress") or []:
+            q = pg.db.allq.get(qid) if pg else None
+            rows.append((f"q{qid}", [name, (q[wpg.LV] if q and q[wpg.LV] > 0 else "?"),
+                                     pg.zone_name(q) if q else "", q[wpg.ENDER] if q else ""],
+                         "link", ("quest", qid)))
+        self.set_rows(rows)
+        self.info.show(f"Quest log\n\n{len(rows)} quest{'s' if len(rows) != 1 else ''} in progress and "
+                       f"{len(s.get('completed') or [])} completed, as of the last time the character logged "
+                       "out.\n\nClick a quest for details; double-click to open it on Wowhead.")
+
+    def quest_detail(self, qid, extra=None):
+        """Quest page; extra is Blizzard's own text for it, fetched the first time a quest is opened."""
+        pg, o = self.pg, self.info
+        self.cur_quest = qid
+        q = pg.db.allq.get(qid) if pg else None
+        o.begin()
+        name = q[wpg.N] if q else next((n for i, n in self.snap.get("in_progress") or [] if i == qid), f"Quest {qid}")
+        o.emit_link(name, wm.WOWHEAD_QUEST.format(qid), "gold", "bold")
+        o.emit("\n")
+        if q:
+            st = {"done": "Done", "active": "In your quest log", "now": "Open to you now",
+                  "gray": "Below your level", "later": "Not yet available",
+                  "closed": "No longer available"}[pg.state(qid)]
+            o.emit(f"Level {q[wpg.LV] if q[wpg.LV] > 0 else '?'}  ·  requires level {q[wpg.RL] or 1}  ·  "
+                   f"{pg.zone_name(q)}  ·  {st}\n", "muted")
+            for label, who, end in (("From: ", q[wpg.GIVER], False), ("Turn in to: ", q[wpg.ENDER], True)):
+                if not who:
+                    continue
+                o.emit(label, "gold")
+                o.emit(who)
+                spot = pg.db.quest_spot(qid, end)
+                if spot:
+                    o.emit(f"  ·  {spot[0]} {spot[1]:g}, {spot[2]:g}   ", "muted")
+                    o.emit_action("Copy waypoint", lambda sp=spot, w=who: self.app.copy_way(wm.way(*sp, w)))
+                o.emit("\n")
+            if q[wpg.TEXT]:
+                o.emit("\nObjective\n", "gold")
+                o.emit(q[wpg.TEXT] + "\n")
+            block = pg.blockers(qid)
+            if block and pg.state(qid) == "later":
+                o.emit("\nBefore you can take it: ", "gold")
+                o.emit(", ".join(block) + "\n")
+        else:
+            o.emit("This quest isn't in the quest list yet.\n", "muted")
+        if extra:
+            if extra.get("desc"):
+                o.emit("\nDescription\n", "gold")
+                o.emit(extra["desc"] + "\n")
+            rewards = []
+            if extra.get("xp"):
+                rewards.append(f"{extra['xp']:,} experience")
+            if extra.get("money"):
+                rewards.append(wp.fmt_gold(int(extra["money"])))
+            rewards += extra.get("items") or []
+            if rewards:
+                o.emit("\nRewards: ", "gold")
+                o.emit(", ".join(rewards) + "\n")
+        elif extra is None and wp.has_credentials():
+            o.emit("\nAsking Blizzard for the description...\n", "muted")
+        o.emit("\nDouble-click the quest in the table to open it on Wowhead.\n", "muted")
+        o.end()
+        if extra is None and wp.has_credentials():
+            def done(res):
+                if self.cur_quest == qid:
+                    self.quest_detail(qid, res[0] or {})
+            self.app.in_background(lambda: capture(lambda: wpg.quest_info(qid)), done)
+
+    def sec_miles(self):
+        s = self.snap
+        rows = []
+        if self.pg:
+            full = [z for z in self.zone_rows if z["total"] >= 5 and z["done"] == z["total"]]
+            rows.append(("m_lvl", [f"Level {s.get('level', 0)}", "", "", ""], "", None))
+            rows.append(("m_q", ["Quests completed", "", len(s.get("completed") or []), ""], "", None))
+            rows.append(("m_z", ["Zones fully completed", "", f"{len(full)} / {len(self.zone_rows)}", ""], "", None))
+        for i, a in enumerate(sorted(s.get("achievements") or [], key=lambda a: (not a["done"], -a["amount"], a["name"]))):
+            rows.append((f"a{i}", [a["name"], "Done" if a["done"] else "In progress" if a["amount"] else "Not started",
+                                   a["amount"] or "", clock(a["ts"] / 1000, "%b %d %Y") if a["ts"] else ""],
+                         "done" if a["done"] else "now" if a["amount"] else "", None))
+        self.set_rows(rows)
+        n = len(s.get("achievements") or [])
+        self.info.show("Milestones\n\n" + (f"Blizzard lists {n} milestones for this character" +
+                       (f" ({s['points']} points)" if s.get("points") else "") + ". " if n else
+                       "Blizzard didn't return any milestones for this character. ") +
+                       "Progress is the number Blizzard reports for the milestone (for a profession milestone, "
+                       "your skill).\n\nThe first rows are the app's own count: your level, quests completed "
+                       "and zones where every quest for your faction and class is done.")
+
+    def sec_reps(self):
+        rows = []
+        for i, r in enumerate(sorted(self.snap.get("reputations") or [], key=lambda r: (-r["tier"], -r["value"]))):
+            pct = round(100 * r["value"] / r["max"]) if r["max"] else 100
+            rows.append((f"r{i}", [r["name"], r["standing"], f"{bar(pct, 100, 8)} {r['value']}/{r['max']}" if r["max"]
+                                   else "", r["max"] - r["value"] if r["max"] else ""], "", None))
+        self.set_rows(rows)
+        self.info.show("Reputations\n\n" + (f"{len(rows)} factions this character has met, highest standing first. "
+                       "\"To next\" is the reputation still needed for the next standing." if rows else
+                       "Blizzard didn't return any reputations for this character."))
+
+    def stat_rows(self, stats, first=()):
+        rows = list(first)
+        for i, s in enumerate(stats):
+            q = s["qty"]
+            val = "" if q is None else f"{int(q):,}" if float(q).is_integer() else f"{q:,.1f}"
+            rows.append((f"s{i}", [s["name"], val, s["desc"], s["sub"] or s["cat"]], "", None))
+        return rows
+
+    def sec_pvp(self):
+        p = self.snap.get("pvp") or {}
+        first = []
+        if p:
+            first = [("p_hk", ["Honorable kills", f"{p.get('hk') or 0:,}", "", "Summary"], "now", None),
+                     ("p_rank", ["PvP rank", p.get("rank") or 0, "", "Summary"], "now", None)]
+        stats = wpg.pick_stats(self.snap, r"player vs|pvp|battleground|arena|honor|duel|killing blow")
+        self.set_rows(self.stat_rows(stats, first))
+        self.info.show("PvP\n\nHonorable kills and rank come from Blizzard's PvP summary; the rest are the PvP "
+                       "statistics Blizzard keeps for the character." +
+                       ("" if stats else "\n\nNo PvP statistics came back for this character yet."))
+
+    def sec_raids(self):
+        s, rows = self.snap, []
+        kills = {}
+        for name, mode, done, total, _ts in (s.get("dungeons") or []) + (s.get("raids") or []):
+            cur = kills.get(name.lower())
+            if not cur or done > cur[0]:
+                kills[name.lower()] = (done, total)
+        for d in (self.pg.dungeons() if self.pg else []):
+            k = kills.pop(d["name"].lower(), None)
+            lv = d["levels"]
+            tag = "done" if d["total"] and d["done"] == d["total"] else "now" if d["fits"] else ""
+            rows.append((f"d{d['id']}", [d["name"], {"raid": "Raid", "dungeon": "Dungeon"}.get(d["kind"], ""),
+                                         f"{d['done']} / {d['total']}", f"{k[0]} / {k[1]}" if k else "",
+                                         f"{lv[0]}-{lv[1]}" if lv else ""], tag, ("dungeon", d["id"])))
+        for name, (done, total) in kills.items():
+            rows.append((f"k{len(rows)}", [name.title(), "", "", f"{done} / {total}", ""], "", None))
+        self.set_rows(rows)
+        stats = wpg.pick_stats(s, r"dungeon|raid|boss")
+        o = self.info
+        o.begin()
+        o.emit("Dungeons and raids\n", "gold", "bold")
+        o.emit("\nQuests done counts each dungeon's quests your faction and class can take. Gold rows are around "
+               "your level. Double-click one to open it in the Dungeons tab.\n")
+        if not (s.get("dungeons") or s.get("raids")):
+            o.emit("\nBlizzard returned no boss kills for this character yet, so Bosses down is empty.\n", "muted")
+        if stats:
+            o.emit("\nDungeon and raid statistics\n", "gold")
+            for st in stats[:40]:
+                q = st["qty"]
+                o.emit(f"    {st['name']}: {'' if q is None else int(q) if float(q).is_integer() else q}"
+                       + (f"  ({st['desc']})" if st["desc"] else "") + "\n")
+        if not self.pg:
+            o.emit("\nThe dungeon list needs the Monster Compendium's data; open that tab to download it.\n", "muted")
+        o.end()
+
+    def sec_profs(self):
+        rows = [(f"p{i}", [p["name"], p["skill"], p["max"], p["recipes"] or ""],
+                 "now" if p["max"] and p["skill"] >= p["max"] else "", None)
+                for i, p in enumerate(self.snap.get("professions") or [])]
+        self.set_rows(rows)
+        self.info.show("Professions\n\nSkill and cap for the rank you've trained. A gold row is at its cap: see "
+                       "a trainer for the next rank.\n\nThe Professions button at the top of the window has "
+                       "priced leveling guides.")
+
+    def sec_stats(self):
+        self.set_rows(self.stat_rows(self.snap.get("stats") or []))
+        self.info.show("All statistics\n\nEverything Blizzard counts for this character, grouped the way "
+                       "Blizzard groups it.")
+
+    # ------------------------------------------------------------ all your characters
+    def sec_chars(self):
+        chars = sorted(wpg.load_saved()["chars"].items(), key=lambda kv: (-kv[1].get("level", 0), kv[0]))
+        rows = []
+        for key, c in chars:
+            profs = ", ".join(f"{p['name']} {p['skill']}" for p in c.get("professions") or [] if p.get("primary")) \
+                or ", ".join(f"{p['name']} {p['skill']}" for p in (c.get("professions") or [])[:2])
+            rows.append(("c_" + key, [f"{c['name']} {c.get('surname', '')}".strip(),
+                                      f"{c.get('level', '?')} {c.get('cls', '')}", len(c.get("completed") or []),
+                                      profs, clock(c.get("fetched", 0), "%b %d, %I:%M %p")],
+                         "now" if self.snap and wpg.key_of(c) == wpg.key_of(self.snap) else "", ("char", key)))
+        self.set_rows(rows)
+        o = self.info
+        o.begin()
+        o.emit("My characters\n", "gold", "bold")
+        o.emit(f"\n{len(rows)} character{'s' if len(rows) != 1 else ''} saved. To add one, type its name above and "
+               "click Load. Click a row for its summary; double-click to switch the whole tab to it.\n")
+        if rows:
+            o.emit("\n")
+            o.emit_action("Refresh all characters from Blizzard", self.refresh_all)
+            o.emit("\n")
+        for key, c in chars:
+            self.char_block(o, key, c)
+        o.emit("\nBlizzard doesn't share bags, bank or gold, so those aren't shown.\n", "muted")
+        o.end()
+
+    def char_block(self, o, key, c, full=False):
+        o.emit(f"\n{c['name']} {c.get('surname', '')}".rstrip() + "\n", "gold", "bold")
+        o.emit(f"Level {c.get('level', '?')} {c.get('race', '')} {c.get('cls', '')}  ·  "
+               f"{'Horde' if c.get('faction') == 'H' else 'Alliance'}"
+               + (f"  ·  <{c['guild']}>" if c.get("guild") else "") + "\n", "muted")
+        pg = wpg.Progress(self.mt.db, c) if self.mt.db is not None else None
+        if pg:
+            zones = pg.zones()
+            done, total = sum(z["done"] for z in zones), sum(z["total"] for z in zones)
+            rec = pg.recommend(zones)
+            o.emit("Quests: ", "gold")
+            o.emit(f"{done} of {total} done  ·  {sum(z['now'] for z in zones)} open now"
+                   + (f"  ·  in the log: {', '.join(n for _i, n in c['in_progress'][:3])}"
+                      if c.get("in_progress") else "") + "\n")
+            o.emit("Next: ", "gold")
+            o.emit((f"quest in {rec['zone']['name']} ({rec['zone']['now']} open)" if rec["zone"]
+                    else "no open quests found at this level")
+                   + (f"  ·  dungeon: {', '.join(d['name'] for d in rec['dungeons'][:2])}"
+                      if rec["dungeons"] else "") + "\n")
+        profs = c.get("professions") or []
+        if profs:
+            o.emit("Professions: ", "gold")
+            o.emit(", ".join(f"{p['name']} {p['skill']}/{p['max']}" for p in profs) + "\n")
+        reps = sorted(c.get("reputations") or [], key=lambda r: (-r["tier"], -r["value"]))
+        if reps:
+            o.emit("Reputations: ", "gold")
+            o.emit(", ".join(f"{r['name']} ({r['standing']})" for r in reps[:None if full else 4])
+                   + (f" +{len(reps) - 4} more" if len(reps) > 4 and not full else "") + "\n")
+        pvp = c.get("pvp") or {}
+        if pvp.get("hk") or pvp.get("rank"):
+            o.emit("PvP: ", "gold")
+            o.emit(f"{pvp.get('hk') or 0:,} honorable kills, rank {pvp.get('rank') or 0}\n")
+        if full:
+            done_m = sum(1 for a in c.get("achievements") or [] if a["done"])
+            o.emit("Milestones: ", "gold")
+            o.emit(f"{done_m} of {len(c.get('achievements') or [])} done\n")
+            o.emit(f"Read from Blizzard {clock(c.get('fetched', 0), '%b %d, %I:%M %p')}\n\n", "muted")
+            o.emit_action("Switch to this character", lambda: self.switch_to(key))
+            o.emit("     ")
+            o.emit_action("Remove from this list", lambda: self.remove_char(key))
+            o.emit("\n")
+
+    def switch_to(self, key):
+        c = wpg.load_saved()["chars"].get(key)
+        if c:
+            set_entry(self.name, c["name"])
+            set_entry(self.second, c.get("surname", ""))
+            wpg.save(c)                      # remembers it as the one to open next time
+            self.section = "next"
+            self.adopt(c)
+
+    def remove_char(self, key):
+        wpg.forget(key)
+        self.refresh_recent()
+        self.show_section()
+
+    def refresh_all(self):
+        if not wp.has_credentials():
+            self.status.config(text="Add your Blizzard API key first (restart the app to enter it).")
+            return
+        self.status.config(text="Reading all your characters from Blizzard...")
+
+        def done(res):
+            got, err = res
+            ok, failed = got or (0, [])
+            self.status.config(text=f"Updated {ok} character{'s' if ok != 1 else ''}"
+                               + (f"; couldn't read {', '.join(failed)}" if failed else "")
+                               + (f"  ({err.splitlines()[-1]})" if err and not got else ""))
+            cur = wpg.load_saved()["chars"].get(wpg.key_of(self.snap)) if self.snap else None
+            if cur:
+                self.adopt(cur)
+            else:
+                self.show_section()
+        self.app.in_background(lambda: capture(wpg.refresh_all), done)
+
+    # ------------------------------------------------------------ rows
+    def on_row(self):
+        sel = self.table.tree.selection()
+        payload = self.rows.get(sel[0]) if sel else None
+        if not payload:
+            return
+        if payload[0] == "stop":
+            self.info.begin()
+            self.emit_stop(self.info, payload[1], links=True)
+            self.info.end()
+        elif payload[0] == "char":
+            c = wpg.load_saved()["chars"].get(payload[1])
+            if c:
+                self.info.begin()
+                self.char_block(self.info, payload[1], c, full=True)
+                self.info.end()
+        elif payload[0] == "quest":
+            self.quest_detail(payload[1])
+        elif payload[0] == "zone":
+            self.zone_detail(payload[1])
+
+    def on_double(self, event):
+        row = self.table.tree.identify_row(event.y)
+        payload = self.rows.get(row)
+        if not payload:
+            return
+        if payload[0] == "stop":
+            self.app.copy_way(self.stop_way(payload[1]))
+        elif payload[0] == "char":
+            self.switch_to(payload[1])
+        elif payload[0] == "quest":
+            webbrowser.open_new_tab(wm.WOWHEAD_QUEST.format(payload[1]))
+        elif payload[0] == "dungeon":
+            self.app.tabs.select(self.app.dungeon_tab)
+            self.app.dungeon_tab.open_dungeon(payload[1])
+        return "break"
 
 
 # ---------------------------------------------------------------- profession leveling guides

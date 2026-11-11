@@ -1,4 +1,4 @@
-Awesome House  -  Beta 0.14
+Awesome House  -  Beta 0.15
 ===========================
 Know what it's worth before you list it.
 Copyright (c) 2026 Kade. All rights reserved. Free for personal use.
@@ -32,10 +32,23 @@ WHAT IT DOES
                 prices and gold-per-hour for gathering sessions.
   Guides        Leveling guides 1-300 for all 12 professions, priced live, with the
                 cheapest option marked. Progress is saved.
-  Monster       NEW. Every monster in each region, what it drops (priced on
+  Monster       Every monster in each region, what it drops (priced on
   Compendium    the auction house), and the quests that need it or its drops.
                 Names link to Wowhead or Warcraft Wiki. Track the monsters
                 you're farming, with a kill counter and notes.
+  Dungeons      NEW. Every Forever dungeon and raid in the monster data:
+                where the entrance is, a route there for each faction,
+                the monsters inside, what they drop (priced on the auction
+                house), and the quests that send you in.
+  Progress      NEW. Load a Forever character to see quests done per zone,
+                the quest log, milestones, reputations, PvP, dungeon and
+                raid progress and professions, plus what to do next. My
+                characters lists everyone you've loaded side by side.
+                Tonight's route orders your open quests into stops with
+                waypoints. Guild crafters shows who can make a recipe.
+  Also new      Copy waypoint (for the TomTom addon) on monsters, quest
+                givers and dungeon entrances. Upgrades from dungeons on the
+                Character tab scores dungeon drops against your gear.
   Tools         Flip finder, custom crafting recipes, fishing spot planner,
                 CSV export.
 
@@ -122,6 +135,13 @@ THINGS TO KNOW
     database. Its Forever data is still filling in, so some new monsters,
     drops and quests are missing. Drop chances are only known for quest items.
     It covers WoW: Forever only.
+  - The Dungeons tab's travel routes are written from Classic-era geography
+    and haven't been checked in Forever yet. Routes for Forever's new
+    dungeons aren't recorded. Click Edit routes in the tab to correct them
+    (it opens dungeon_travel.json next to the app).
+  - The Progress tab shows what Blizzard last saved for a character, which
+    updates when the character logs out. Its quest suggestions depend on
+    QuestieDB's quest list, so a quest can be missing or listed too early.
 
 
 SUPPORT THE PROJECT
@@ -151,5 +171,5 @@ LICENSE IN SHORT
 
 Awesome House is a fan-made tool. Not affiliated with or endorsed by Blizzard Entertainment.
 World of Warcraft is a trademark of Blizzard Entertainment, Inc.
-Monster Compendium data: QuestieDB (github.com/Questie/QuestieDB), downloaded separately.
+Monster Compendium and Dungeons data: QuestieDB (github.com/Questie/QuestieDB), downloaded separately.
 Pixel fonts Pixelify Sans and VT323 are used under the SIL Open Font License 1.1.

@@ -52,6 +52,7 @@ jobs:
           --name AwesomeHouse --icon ah_coin_icon.ico
           --add-data "ah_coin_icon.ico;." --add-data "item_info.json;."
           --add-data "item_stats.json;." --add-data "item_cache.json;."
+          --add-data "dungeon_travel.json;."
           wow_price_gui.pyw
 
       - name: Make the share zip and checksums

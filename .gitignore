@@ -9,6 +9,7 @@ fishing_spots.json
 recipes.json
 guide_progress.json
 monster_tracking.json
+character_progress.json
 guides/
 
 # ---- build output (GitHub builds releases itself) ----

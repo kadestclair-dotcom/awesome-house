@@ -199,42 +199,86 @@ class Blizz:
 
 # ---------- item lookup ----------
 
+def norm_name(text):
+    """Item names compared the same way everywhere: case, spacing and curly apostrophes ignored."""
+    return " ".join((text or "").replace("\u2019", "'").replace("\u2018", "'").lower().split())
+
+
+def _known_matches(game, words):
+    """(id, name) for items the app has already seen whose name contains every word."""
+    out = []
+    for key, info in _info_cache().items():
+        g, _, iid = key.partition(":")
+        name = info.get("name")
+        if g == game and iid.isdigit() and name and all(w in norm_name(name) for w in words):
+            out.append((int(iid), name))
+    return out
+
+
 def find_items(api, query, class_id=None, subclass_id=None):
     """Return list of (id, name). Accepts an item name or a numeric item ID,
-    optionally limited to one auction-house category."""
-    if query.strip().isdigit():
+    optionally limited to one auction-house category.
+
+    Blizzard's name search matches ANY word of the query and returns the lowest item IDs first,
+    so "Heavy Leather" brings back every leather item and the real one can be pages down. This
+    reads further pages until the exact name turns up, then keeps only names that contain every
+    word typed (falling back to the loose matches when nothing does)."""
+    query = " ".join(query.replace("\u2019", "'").replace("\u2018", "'").split())
+    if query.isdigit():
         item_id = int(query)
         try:
             d = api.get(f"/data/wow/item/{item_id}", "static")
             info = remember_info(api.game, item_id, d)
             return [(item_id, info["name"] or f"Item {item_id}")]
         except ApiError:
-            return [(item_id, f"Item {item_id}")]
+            return [(item_id, cached_info(api.game, item_id).get("name") or f"Item {item_id}")]
 
-    try:
-        params = {"name.en_US": query, "orderby": "id", "_pageSize": 100}
-        if class_id is not None:
-            params["item_class.id"] = class_id
-        if subclass_id is not None:
-            params["item_subclass.id"] = subclass_id
-        res = api.get("/data/wow/search/item", "static", **params)
-    except ApiError as e:
-        raise SystemExit(
-            "Item name search isn't working for this game's data right now.\n"
-            "Look up the item ID instead (e.g. search the item on Wowhead - the number in "
-            "the page address) and enter that number.\n"
-            f"({e.code})")
-    items = []
-    for r in res.get("results", []):
-        d = r.get("data", {})
-        nm = d.get("name", {})
-        nm = nm.get("en_US") if isinstance(nm, dict) else nm
-        if nm:
-            items.append((d["id"], nm))
-            remember_info(api.game, d["id"], d, save=False)
+    want, words = norm_name(query), norm_name(query).split()
+    params = {"name.en_US": query, "orderby": "id", "_pageSize": 1000}
+    if class_id is not None:
+        params["item_class.id"] = class_id
+    if subclass_id is not None:
+        params["item_subclass.id"] = subclass_id
+    items, seen, page, max_pages = [], set(), 1, 3
+    while page <= max_pages:
+        try:
+            res = api.get("/data/wow/search/item", "static", **params, _page=page)
+        except ApiError as e:
+            if page == 1 and params["_pageSize"] == 1000:
+                params["_pageSize"] = 100            # some API versions cap the page size
+                continue
+            if page > 1:
+                break
+            raise SystemExit(
+                "Item name search isn't working for this game's data right now.\n"
+                "Look up the item ID instead (e.g. search the item on Wowhead - the number in "
+                "the page address) and enter that number.\n"
+                f"({e.code})")
+        results = res.get("results", [])
+        if page == 1 and len(results) <= 100:
+            max_pages = 6                            # small pages: allow a few more of them
+        for r in results:
+            d = r.get("data", {})
+            nm = _loc(d.get("name"))
+            if nm and d.get("id") not in seen:
+                seen.add(d["id"])
+                items.append((d["id"], nm))
+                remember_info(api.game, d["id"], d, save=False)
+        if any(norm_name(n) == want for _i, n in items) or page >= (res.get("pageCount") or 1) \
+                or len(results) < 100:
+            break
+        page += 1
     save_info()
-    exact = [i for i in items if i[1].lower() == query.lower()]
-    return exact or items
+    if class_id is None:                             # plus anything already known locally
+        for iid, nm in _known_matches(api.game, words):
+            if iid not in seen:
+                seen.add(iid)
+                items.append((iid, nm))
+    exact = [i for i in items if norm_name(i[1]) == want]
+    if exact:
+        return exact
+    every = [i for i in items if all(w in norm_name(i[1]) for w in words)]
+    return every or items[:200]
 
 
 # ---------- item categories (same as the in-game auction house) ----------
@@ -407,11 +451,25 @@ def forever_house_list(api):
     return houses or [(h, f"Auction house {h}") for h in FOREVER_FALLBACK_HOUSES]
 
 
+_forever_memo = {}      # region -> (snapshot time, sources, gear ids): skip re-reading the big file
+
+
 def forever_sources(api):
+    path = os.path.join(CACHE_DIR, f"{api.game}_{api.region}_forever_all_houses_v5.json")
+    memo = _forever_memo.get(api.region)
+    try:
+        mtime = int(os.path.getmtime(path))
+    except OSError:
+        mtime = None
+    if memo and mtime == memo[0] and time.time() - mtime < CACHE_SECONDS:
+        api.snapshot_time, api.gear_ids = memo[0], memo[2]
+        return memo[1]
+
     def fetch_all():
-        out = []
         base = f"/data/wow/ruleset/{FOREVER_RULESET}/auctions"
-        for hid, name in forever_house_list(api):
+
+        def one(house):
+            hid, name = house
             listings, seen, gear = [], set(), set()
 
             def add(lst):
@@ -455,8 +513,12 @@ def forever_sources(api):
                 except ApiError:
                     pass
             gear.discard(None)
-            out.append({"id": hid, "name": name, "auctions": listings, "gear": sorted(gear)})
-        return out
+            return {"id": hid, "name": name, "auctions": listings, "gear": sorted(gear)}
+
+        # the houses don't depend on each other, so ask for several at once
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(5) as ex:
+            return list(ex.map(one, forever_house_list(api)))
 
     houses = api.cached("forever_all_houses_v5", fetch_all)
     api.gear_ids = {i for h in houses for i in h.get("gear", [])}
@@ -470,6 +532,10 @@ def forever_sources(api):
         # several houses can share a name; add the number so they can be told apart
         label = f"{h['name']} #{h['id']}" if counts[h["name"]] > 1 else h["name"]
         sources.append((label, book))
+    try:
+        _forever_memo[api.region] = (int(os.path.getmtime(path)), sources, api.gear_ids)
+    except OSError:
+        pass
     return sources
 
 
@@ -485,7 +551,13 @@ def summarize(listings):
         spent += take * price
         if acc >= target:
             break
-    median = statistics.median_low([p for p, q in listings for _ in range(min(q, 1000))])
+    weights = [max(0, min(int(q), 1000)) for _, q in listings]
+    want, seen, median = (sum(weights) - 1) // 2, 0, lowest
+    for (price, _q), w in zip(listings, weights):
+        seen += w
+        if seen > want:
+            median = price
+            break
     return {"lowest": lowest, "cheap10": spent / acc, "median": median,
             "quantity": total, "listings": len(listings)}
 
@@ -502,8 +574,9 @@ def lookup_items(api, query, limit=None, class_id=None, subclass_id=None):
     sources = get_sources(api)
     res["ts"] = api.snapshot_time
     out = build_entries(api, sources, items)
-    q = query.strip().lower()
-    out.sort(key=lambda e: (e["name"].lower() != q, not e["found"], -(e.get("quantity") or 0), e["name"]))
+    q = norm_name(query)
+    out.sort(key=lambda e: (norm_name(e["name"]) != q, q not in norm_name(e["name"]), not e["found"],
+                            -(e.get("quantity") or 0), e["name"]))
     # fill in categories the search didn't include, for the results people will see
     missing = [e for e in out[:limit] if not e.get("cls")][:15]
     for e in missing:
@@ -577,30 +650,60 @@ def connect(game="forever", region="us"):
     return Blizz(get_token(cid, secret), region, game)
 
 
-def resolve_item(api, query):
-    """Turn a name or ID into {'id', 'name'}; None if not found."""
-    items = find_items(api, query)
+def local_item(game, query):
+    """{'id', 'name'} for an exact item name the app has already seen, else None."""
+    found = [(i, n) for i, n in _known_matches(game, norm_name(query).split()) if norm_name(n) == norm_name(query)]
+    return _pick(game, found)
+
+
+def _pick(game, items):
+    """One of several items sharing a name: the one on the auction house now, else the lowest ID."""
     if not items:
         return None
-    item_id, name = items[0]
+    memo = _forever_memo.get("us") if game == "forever" else None
+    listed = [i for i in items if memo and any(i[0] in book for _l, book in memo[1])]
+    item_id, name = min(listed or items)
     return {"id": item_id, "name": name}
+
+
+def resolve_item(api, query):
+    """Turn a name or ID into {'id', 'name'}; None if not found.
+    A name must match exactly: a near miss would price a different item."""
+    query = query.strip()
+    if query.isdigit():
+        items = find_items(api, query)
+        return {"id": items[0][0], "name": items[0][1]} if items else None
+    known = local_item(api.game, query)
+    if known:
+        return known
+    return _pick(api.game, [i for i in find_items(api, query) if norm_name(i[1]) == norm_name(query)])
 
 
 def get_sources(api, realm=None):
     return forever_sources(api) if api.game == "forever" else retail_sources(api, realm)
 
 
+_summary_memo = [None, {}]      # [the sources it belongs to, {item id: summary}]
+
+
 def item_summary(sources, item_id):
-    """Combine an item's listings across every auction house. None if not listed."""
+    """Combine an item's listings across every auction house. None if not listed.
+    Remembered per price snapshot, so tables can ask again for free."""
+    if _summary_memo[0] is not sources:
+        _summary_memo[:] = [sources, {}]
+    memo = _summary_memo[1]
+    if item_id in memo:
+        s = memo[item_id]
+        return dict(s) if s else None
     listings, cheapest_house, cheapest = [], None, None
     for label, book in sources:
         for price, qty in book.get(item_id, []):
             listings.append((price, qty))
             if cheapest is None or price < cheapest:
                 cheapest, cheapest_house = price, label
-    if not listings:
-        return None
-    return {**summarize(listings), "house": cheapest_house}
+    s = {**summarize(listings), "house": cheapest_house} if listings else None
+    memo[item_id] = s
+    return dict(s) if s else None
 
 
 def check_watchlist(api, entries, realm=None):
@@ -700,7 +803,7 @@ ITEM_CACHE_PATH = os.path.join(HERE, "item_cache.json")
 
 def resolve_cached(api, query):
     """resolve_item, but remembers answers so repeat lookups skip the search."""
-    key = f"{api.game}:{query.strip().lower()}"
+    key = f"{api.game}:{norm_name(query)}"
     cache = {}
     if os.path.exists(ITEM_CACHE_PATH):
         try:
@@ -708,8 +811,10 @@ def resolve_cached(api, query):
                 cache = json.load(f)
         except (OSError, ValueError):
             cache = {}
-    if key in cache:
-        return cache[key]
+    hit = cache.get(key)
+    name = norm_name(query)
+    if hit and (name.isdigit() or norm_name(hit.get("name")) == name):
+        return hit                 # (older versions could save a different item under a name)
     entry = resolve_item(api, query)
     if entry:
         cache[key] = entry
@@ -871,8 +976,9 @@ def history_stats(game, item_id, days=7, before_ts=None):
 
 # ---------- sell-price helper ----------
 
-def sell_advice(api, query, my_qty=None):
-    item = resolve_cached(api, query)
+def sell_advice(api, query, my_qty=None, item=None):
+    """item = {'id', 'name'} skips the name lookup (used when the item was picked from a list)."""
+    item = item or resolve_cached(api, query)
     if not item:
         return None
     sources = get_sources(api)
