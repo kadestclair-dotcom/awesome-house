@@ -40,6 +40,7 @@ You shouldn't have to take anyone's word for it, so here is how you can check:
   `gh attestation verify AwesomeHouse-<version>.zip --repo kadestclair-dotcom/awesome-house`
   to confirm the file came from this repository's code.
 - **Each release lists SHA-256 checksums** in `SHA256SUMS.txt`. In PowerShell, `Get-FileHash .\AwesomeHouse-*.zip` should print the same code.
+- **You can skip the exe entirely.** The app is plain Python using only the standard library. Install [Python 3.12+](https://www.python.org/downloads/), download this repository (**Code › Download ZIP**), unzip it into a folder of its own and double-click `wow_price_gui.pyw`.
 - **Your data stays on your PC.** You use your own Blizzard key. The app never asks for your Battle.net password. It only talks to Blizzard's API, and to GitHub to download the free [QuestieDB](https://github.com/Questie/QuestieDB) monster data (it asks first).
 
 More in [SECURITY.md](SECURITY.md).
@@ -53,6 +54,7 @@ More in [SECURITY.md](SECURITY.md).
 - The Monster Compendium's data is community-made and still filling in for Forever's new areas. Drop chances are only known for quest items.
 - The Dungeons tab's travel routes are written from Classic-era geography and haven't been checked in Forever yet. Routes for Forever's new dungeons aren't recorded. **Edit routes** in the tab opens `dungeon_travel.json` so you can correct them.
 - The Progress tab reads what Blizzard last saved for a character, which updates when the character logs out. Its quest suggestions depend on QuestieDB's quest list, so a quest can be missing or listed too early.
+- Some antivirus programs wrongly flag apps packed with PyInstaller. Please don't turn your antivirus off for it: check the checksum above, or run it from source instead.
 - Your Blizzard Client Secret is saved in `wow_price_config.json` next to the app. Don't share your app folder once it's set up.
 
 ## Support the project

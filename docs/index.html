@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Awesome House: auction house price checker for WoW: Forever</title>
-<meta name="description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades and a Monster Compendium.">
+<meta name="description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades, a monster and dungeon guide, and quest progress with a route for your character.">
 <link rel="icon" href="favicon.ico">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Awesome House">
 <meta property="og:title" content="Awesome House: know what it's worth before you list it">
-<meta property="og:description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades and a Monster Compendium.">
+<meta property="og:description" content="Free Windows companion app that reads the WoW: Forever auction house for you: prices at every auction house, trends, alerts, gear upgrades, a monster and dungeon guide, and quest progress with a route for your character.">
 <meta property="og:url" content="https://kadestclair-dotcom.github.io/awesome-house/">
 <meta property="og:image" content="https://kadestclair-dotcom.github.io/awesome-house/images/og.png">
 <meta property="og:image:width" content="1200">
@@ -217,7 +217,7 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
 <body>
 <div class="wrap">
   <header class="bar">
-    <div class="brand"><span class="coin" aria-hidden="true"></span>Awesome House <span class="ver">Beta 0.14</span></div>
+    <div class="brand"><span class="coin" aria-hidden="true"></span>Awesome House <span class="ver">Beta 0.15</span></div>
     <nav aria-label="Page sections">
       <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">Download</a>
       <a href="#features">Features</a>
@@ -233,9 +233,9 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
   <main>
     <div class="hero">
       <div>
-        <p class="eyebrow">Free &middot; Beta 0.14 &middot; For WoW: Forever &middot; retail supported too</p>
+        <p class="eyebrow">Free &middot; Beta 0.15 &middot; For WoW: Forever &middot; retail supported too</p>
         <h1 style="margin-top:10px">Know what it's worth <em>before you list it.</em></h1>
-        <p class="lede">A Windows desktop companion app that reads the auction house for you. See prices at every auction house, follow trends, get alerted when an item crosses your number, find out which gear upgrade is actually worth the gold, and look up what every monster drops.</p>
+        <p class="lede">A Windows desktop companion app that reads the auction house for you. See prices at every auction house, follow trends, get alerted when an item crosses your number, find out which gear upgrade is actually worth the gold, look up what every monster and dungeon drops, and get a route through the quests open to your character.</p>
         <div class="cta-row">
           <a class="btn red" href="https://github.com/kadestclair-dotcom/awesome-house/releases">Download free on GitHub</a>
           <a class="btn ghost" href="about-awesome-house.pdf">Illustrated tour (PDF)</a>
@@ -243,7 +243,8 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
         <div class="chips">
           <span><b>12</b> profession guides, 1&ndash;300</span>
           <span><b>~15</b> auction houses compared</span>
-          <span><b>3,700+</b> monsters in the compendium</span>
+          <span><b>4,000+</b> monsters in the compendium</span>
+          <span><b>33</b> dungeons and raids</span>
           <span><b>Hourly</b> price checks</span>
           <span><b>Your</b> own Blizzard key</span>
         </div>
@@ -303,8 +304,8 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
     <section id="features">
       <div class="sec-head">
         <p class="eyebrow">Everything inside</p>
-        <h2>Seven tools in one window.</h2>
-        <p class="lede">Each tab does one job. Together they cover buying, selling, crafting, leveling, gearing and farming.</p>
+        <h2>Ten tools in one window.</h2>
+        <p class="lede">Each one does one job. Together they cover buying, selling, crafting, leveling, gearing, farming and questing.</p>
       </div>
       <div class="grid">
         <article class="px feat">
@@ -312,6 +313,7 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
           <h3>Find anything on the auction house</h3>
           <ul>
             <li>Browse the same category list the game uses, loaded straight from Blizzard</li>
+            <li>Type all or part of a name: the exact item comes first, then names with every word you typed</li>
             <li>Filter by quality, required level, price range, or items currently for sale</li>
             <li>Sort results and see the price at each auction house on every card</li>
             <li>Add items to your Watchlist in one click, or open them on Wowhead</li>
@@ -338,6 +340,7 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
             <li>Upgrades are limited to what your class can wear and wield</li>
             <li>Each result shows an Upgrade % over your equipped item</li>
             <li>A "Why these results?" breakdown shows how many items were known, for sale, usable, missing data, or better</li>
+            <li>Upgrades from dungeons scores dungeon and raid drops the same way and names the monster that drops each</li>
           </ul>
         </article>
         <article class="px feat">
@@ -366,12 +369,13 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
             <li>Flip finder lists items listed below what they typically resell for, after the auction house cut</li>
             <li>Custom crafting recipes with profit worked out for you</li>
             <li>Fishing spot planner and session value</li>
+            <li>Guild crafters shows who in your guild can make a recipe</li>
             <li>CSV export of your price history and sessions, for spreadsheets</li>
             <li>Pixel-art look with quality-colored item names and coin icons</li>
           </ul>
         </article>
         <article class="px feat wide">
-          <span class="badge q-legend">Monster Compendium<span class="new">New</span></span>
+          <span class="badge q-legend">Monster Compendium</span>
           <h3>Every monster, what it drops, and why you'd hunt it</h3>
           <ul>
             <li>Monsters listed by region: Eastern Kingdoms, Kalimdor, the new Forever areas, dungeons and raids</li>
@@ -380,6 +384,39 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
             <li>Monster names link to Wowhead or Warcraft Wiki, whichever you prefer</li>
             <li>Track the monsters you're farming, with a kill counter and notes</li>
             <li>Search by monster name, or by an item to see who drops it</li>
+            <li>See where each monster spawns, and copy a waypoint for the TomTom addon</li>
+            <li>With a character loaded, a For you column marks the drops that are upgrades</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-rare">Dungeons<span class="new">New</span></span>
+          <h3>Know the dungeon before you go</h3>
+          <ul>
+            <li>Every WoW: Forever dungeon and raid in the monster data, sorted by level</li>
+            <li>Where the entrance is, with a route there for Alliance and for Horde</li>
+            <li>Every monster inside and everything they drop, priced on the auction house</li>
+            <li>The quests that send you in, with who gives them</li>
+            <li>Travel notes are a plain file you can correct yourself</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-epic">Progress<span class="new">New</span></span>
+          <h3>See where your character stands</h3>
+          <ul>
+            <li>Quests done per zone, counted only for your faction and class</li>
+            <li>Quest log, milestones, reputations, PvP, dungeons, raids and professions</li>
+            <li>What to do next, built from the quests open to you right now</li>
+            <li>My characters lists everyone you've loaded side by side</li>
+          </ul>
+        </article>
+        <article class="px feat">
+          <span class="badge q-good">Tonight's route<span class="new">New</span></span>
+          <h3>Your open quests, in order</h3>
+          <ul>
+            <li>Turns your open quests into numbered stops: pick up, do, turn in</li>
+            <li>Each stop has map coordinates and a waypoint to copy</li>
+            <li>Nearest stop first, never an objective before its pick-up</li>
+            <li>Steps with no known location are listed, not hidden</li>
           </ul>
         </article>
       </div>
@@ -424,16 +461,17 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
             <li>Your Blizzard API ID and secret</li>
             <li>Watchlist and alerts</li>
             <li>Price history database</li>
-            <li>Characters you looked up</li>
+            <li>Characters you looked up, and their saved progress</li>
             <li>Guide progress and fishing sessions</li>
             <li>Tracked monsters, kill counts and notes</li>
+            <li>Your guild's crafter list, refreshed once a day</li>
           </ul>
         </div>
         <div class="px box leave">
           <h3>Goes over the internet</h3>
           <ul>
             <li>Login and data requests to Blizzard's servers, using your own key</li>
-            <li>GitHub, once, to download the free QuestieDB monster data when you first open the Monster Compendium (and when you click Update data)</li>
+            <li>GitHub, once, to download the free QuestieDB monster data when you first open the Monster Compendium, Dungeons or Progress (and when you click Update data)</li>
             <li>Wowhead or Warcraft Wiki, only when you click a link, and only in your browser</li>
           </ul>
           <p class="sub" style="font-size:20px">The app never asks for your Battle.net password. Every other request stays on your machine.</p>
@@ -513,13 +551,13 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
           <tbody>
             <tr>
               <td>Beta software<br><span class="sev mid">Expect bugs</span></td>
-              <td>Awesome House is at Beta 0.14. Features are still being added and some things will break or change between versions.</td>
+              <td>Awesome House is at Beta 0.15. Features are still being added and some things will break or change between versions.</td>
               <td>Use Support &gt; Report a bug when something looks wrong. Screenshots help.</td>
             </tr>
             <tr>
               <td>Windows warning<br><span class="sev mid">Expect it</span></td>
               <td>The app is not code-signed, so Windows SmartScreen shows "Windows protected your PC." Some antivirus programs also wrongly flag apps packaged with PyInstaller.</td>
-              <td>Click More info, then Run anyway. Only download from the official GitHub Releases page, where every release is built by GitHub from the public code. If your antivirus flags it, check the zip against SHA256SUMS.txt on the release.</td>
+              <td>Click More info, then Run anyway. Only download from the official GitHub Releases page, where every release is built by GitHub from the public code. If your antivirus flags it, don't turn the antivirus off: check the zip against SHA256SUMS.txt on the release, or run the app from its source code instead (see Quick answers).</td>
             </tr>
             <tr>
               <td>Your API secret is stored as plain text<br><span class="sev high">Protect it</span></td>
@@ -542,6 +580,16 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
               <td>Click Update data now and then to get the latest release. Use the Wowhead link to double-check a drop before you farm for hours.</td>
             </tr>
             <tr>
+              <td>Dungeon routes are unchecked<br><span class="sev low">Limit</span></td>
+              <td>Travel routes on the Dungeons tab are written from Classic-era geography and have not been checked in Forever. Forever's new dungeons have no route yet. Entrance coordinates come from QuestieDB.</td>
+              <td>Treat a route as a starting point. Click Edit routes to correct one; your copy is kept next to the app.</td>
+            </tr>
+            <tr>
+              <td>Progress is as of your last logout<br><span class="sev low">Limit</span></td>
+              <td>Blizzard updates a character when it logs out, so the Progress tab can be a session behind. Quest suggestions and the route rely on QuestieDB's quest list, don't know about roads or flight paths, and can't tell which objectives you've finished.</td>
+              <td>Load the character again after you play. Use the route as a plan, and your quest log as the truth.</td>
+            </tr>
+            <tr>
               <td>History starts when you do<br><span class="sev low">Limit</span></td>
               <td>Price history is recorded only while the app is open, one point per hourly snapshot. Trends need time to fill in.</td>
               <td>Leave it running in the background while you play, especially for items you care about.</td>
@@ -558,7 +606,7 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
             </tr>
             <tr>
               <td>New characters<br><span class="sev low">Limit</span></td>
-              <td>In Forever, characters only show up in lookups from level 10, after you log out.</td>
+              <td>In Forever, characters only show up in lookups from level 10, after you log out. The same goes for guild members on the Guild crafters list.</td>
               <td>If a lookup fails, log out and try again in a few minutes.</td>
             </tr>
           </tbody>
@@ -596,11 +644,11 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
       </details>
       <details>
         <summary>Does it work for retail WoW?</summary>
-        <p>Yes. It is built for WoW: Forever and supports retail as well. For retail, character lookups use the character name and realm. The Monster Compendium covers Forever only.</p>
+        <p>Yes. It is built for WoW: Forever and supports retail as well. For retail, character lookups use the character name and realm. The Monster Compendium, Dungeons and Progress tabs, Upgrades from dungeons and Guild crafters cover Forever only.</p>
       </details>
       <details>
         <summary>Where does the monster data come from?</summary>
-        <p>From QuestieDB, the free community database behind the Questie addon. It isn't packed into the app: the first time you open the Monster Compendium, the app asks before downloading it from GitHub (about 14 MB) and keeps it on your computer.</p>
+        <p>From QuestieDB, the free community database behind the Questie addon. It isn't packed into the app: the first time you open the Monster Compendium, Dungeons or Progress, the app asks before downloading it from GitHub (about 14 MB) and keeps it on your computer.</p>
       </details>
       <details>
         <summary>Can I back up or move my data?</summary>
@@ -612,13 +660,17 @@ footer { margin-top: 72px; padding-top: 24px; border-top: 3px solid var(--line);
       </details>
       <details>
         <summary>What if my antivirus blocks it?</summary>
-        <p>This happens with many apps built the same way. If you trust where you got the file, add the app's folder as an exception, or ask whoever shared it for the checksum so you can verify the file is unchanged.</p>
+        <p>Some antivirus programs flag apps packed with PyInstaller, the tool used to turn the app into a single .exe, even when they're clean. Don't turn your antivirus off for it. Instead, make sure the zip came from the official Releases page, compare it with SHA256SUMS.txt on that release, and if you like, upload it to virustotal.com for a second opinion. If you'd still rather not run the .exe, run the app from its source code instead (next question). <a href="https://github.com/kadestclair-dotcom/awesome-house/blob/main/SECURITY.md">SECURITY.md</a> has the details.</p>
+      </details>
+      <details>
+        <summary>Can I run it without the .exe?</summary>
+        <p>Yes. The app is plain Python and uses only Python's standard library, so there is nothing else to install. Install Python 3.12 or newer from python.org, download the source code from the repository (Code &gt; Download ZIP), unzip it into a folder of its own and double-click <b>wow_price_gui.pyw</b>. It works the same as the .exe and keeps its files in that folder.</p>
       </details>
     </section>
 
     <footer>
       <p>Official download: <a href="https://github.com/kadestclair-dotcom/awesome-house/releases">github.com/kadestclair-dotcom/awesome-house/releases</a> &middot; Source code: <a href="https://github.com/kadestclair-dotcom/awesome-house">github.com/kadestclair-dotcom/awesome-house</a> &middot; <a href="about-awesome-house.pdf">Illustrated tour (PDF)</a></p>
-      <p>Awesome House Beta 0.14 &middot; &copy; 2026 Kade. All rights reserved. Free for personal, non-commercial use. Full terms are in LICENSE.txt, included with the app.</p>
+      <p>Awesome House Beta 0.15 &middot; &copy; 2026 Kade. All rights reserved. Free for personal, non-commercial use. Full terms are in LICENSE.txt, included with the app.</p>
       <p>Awesome House is a fan-made tool and is not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.</p>
       <p>Monster Compendium data: QuestieDB (github.com/Questie/QuestieDB), downloaded separately on your computer. Pixel fonts Pixelify Sans and VT323 are used under the SIL Open Font License 1.1.</p>
     </footer>

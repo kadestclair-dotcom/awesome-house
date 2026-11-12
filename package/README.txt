@@ -119,7 +119,10 @@ YOUR PRIVACY
 THINGS TO KNOW
 --------------
   - The app isn't code-signed, so Windows shows a warning (see step 2). Some
-    antivirus programs also wrongly flag apps built with PyInstaller.
+    antivirus programs also wrongly flag apps built with PyInstaller. Please
+    don't turn your antivirus off for it: check the zip as described above,
+    or run the app from its source code instead (see SECURITY.md on the
+    GitHub page).
   - Your API secret is saved as plain text in wow_price_config.json next to the
     app. Don't zip up and share your folder once you've set it up. If it leaks,
     delete the client at develop.battle.net and make a new one.
