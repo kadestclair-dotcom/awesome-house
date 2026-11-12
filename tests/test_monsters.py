@@ -305,6 +305,26 @@ def test_an_update_in_an_unknown_layout_keeps_the_old_data(old_data, monkeypatch
     assert not [n for n in os.listdir(wm.DATA_DIR) if n.endswith((".new", ".part", ".tmp"))]
 
 
+def test_reading_a_release_closes_the_zip(monkeypatch, tmp_path):
+    """Windows can't delete or replace a file that is still open, so a failed update would leave
+    QuestieDB-Forever.zip.new behind (and a good one couldn't replace the old zip). Linux doesn't
+    mind, so check directly that every zip build_index opens is closed again, pass or fail."""
+    import zipfile
+    opened = []
+
+    class Tracked(zipfile.ZipFile):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            opened.append(self)
+
+    monkeypatch.setattr(wm.zipfile, "ZipFile", Tracked)
+    bad = tmp_path / "bad.zip"
+    bad.write_bytes(_zip_bytes({"QuestieDB/QuestieDB_Forever.toc": "## Version: 2.0.0"}))
+    with pytest.raises(wm.DataError):
+        wm.build_index(progress=lambda m: None, zip_path=str(bad))
+    assert opened and all(z.fp is None for z in opened)
+
+
 def test_a_good_update_replaces_the_old_zip(old_data, monkeypatch):
     new = _zip_bytes({"QuestieDB/QuestieDB_Forever.toc": "## Version: 2.0.0"})
     monkeypatch.setattr(wm, "_get", lambda url, timeout=60: (url, new))

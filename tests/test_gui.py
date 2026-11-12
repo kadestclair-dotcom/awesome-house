@@ -296,6 +296,8 @@ def test_help_menu_opens_the_privacy_policy(app):
     menubar = app.root.nametowidget(app.root.cget("menu"))
     labels = []
     for i in range(menubar.index("end") + 1):
+        if menubar.type(i) != "cascade":      # Tk 8.6 (Windows) puts a hidden tear-off entry first
+            continue
         sub = menubar.nametowidget(menubar.entrycget(i, "menu"))
         labels += [sub.entrycget(j, "label") for j in range(sub.index("end") + 1) if sub.type(j) == "command"]
     assert "Privacy policy..." in labels

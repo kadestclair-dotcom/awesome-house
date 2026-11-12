@@ -407,8 +407,13 @@ def build_index(version=None, progress=print, zip_path=None):
 
 
 def _build_index(version, progress, zip_path):
+    # Always close the zip, even on an error: Windows can't delete or replace a file that's still open.
+    with zipfile.ZipFile(zip_path) as zf:
+        return _build_index_from(zf, version, progress)
+
+
+def _build_index_from(zf, version, progress):
     progress("Reading monsters, drops and quests...")
-    zf = zipfile.ZipFile(zip_path)
     toc_name = next((n for n in zf.namelist() if n.endswith("QuestieDB_Forever.toc")), None) \
         or next((n for n in zf.namelist() if n.endswith(".toc")), None)
     if not toc_name:
