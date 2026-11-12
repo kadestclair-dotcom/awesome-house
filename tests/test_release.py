@@ -33,7 +33,7 @@ def app_version():
 
 
 def test_version_matches_everywhere():
-    v = app_version()                                          # "Beta 0.16"
+    v = app_version()                                          # "Beta 0.16.1"
     assert re.fullmatch(r"(Beta )?\d+\.\d+(\.\d+)?", v)
     bat = re.search(r"^set VERSION=(\S+)", read("build_exe.bat"), re.M)
     assert bat and bat.group(1) == v.replace(" ", "-"), "VERSION in build_exe.bat"

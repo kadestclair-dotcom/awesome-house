@@ -1,5 +1,16 @@
 # Changelog
 
+## Beta 0.16.1 — up-to-date documents (Nov 12 2026)
+
+The app itself is the same as 0.16; this release brings the files that ship with it up to date.
+- **About Awesome House.pdf** is reprinted from the current website: the Dungeons and Progress tabs,
+  the 30-day data limit, the privacy policy, the QuestieDB credit and Blizzard's trademark wording.
+- **README.txt in the zip** lists every file in the folder (PRIVACY.txt, THIRD-PARTY-NOTICES.txt,
+  PYTHON-LICENSE.txt and FONTS-LICENSE.txt were missing), explains how to update from an older version
+  without losing your data, and says that data from Blizzard is deleted after 30 days.
+- `docs/publishing.md`: every place the version number goes, how to tag a commit in GitHub Desktop
+  (lowercase `v`), and adding the release notes.
+
 ## Beta 0.16 — Windows fix (Nov 12 2026)
 
 - **Monster data updates no longer leave a `QuestieDB-Forever.zip.new` file behind on Windows.** The

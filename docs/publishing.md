@@ -22,14 +22,17 @@ A one-time setup, then about two minutes per release. These steps use **GitHub D
 
 ## Making a release
 
-1. Put the new version number in two places:
-   - `APP_VERSION` near the top of `wow_price_gui.pyw` (e.g. `"Beta 0.16"`)
-   - `VERSION` in `build_exe.bat` (e.g. `Beta-0.16`), for local builds
+1. Put the new version number in every place it appears (the tests check these):
+   - `APP_VERSION` near the top of `wow_price_gui.pyw` (e.g. `"Beta 0.16.1"`), plus the first line of that file
+   - `VERSION` in `build_exe.bat` (e.g. `Beta-0.16.1`), for local builds
+   - `README.md`, `package/README.txt`, `SECURITY.md` and `docs/index.html`
+   - a new section at the top of `CHANGELOG.md`
 2. In GitHub Desktop, commit the changes with a short summary, then **Push origin**.
-3. **Repository › Create tag…**, name it like `v0.16-beta`, then **Push origin** again. Pushing the tag starts the build.
-4. On github.com, open the **Actions** tab. The *Build and release* run takes about 3–5 minutes. When it turns green, the **Releases** page has `AwesomeHouse-Beta-0.16.zip` and `SHA256SUMS.txt`. Beta versions are marked *Pre-release* automatically.
-5. Optional: upload the zip to [virustotal.com](https://www.virustotal.com/) and paste the result link into the release notes (Edit release).
-6. Send friends the **Releases page link** (github.com/kadestclair-dotcom/awesome-house/releases), not the zip itself.
+3. In the **History** tab, right-click the new commit › **Create Tag…**, name it like `v0.16.1-beta` (**lowercase v**: the build only starts for tags beginning with `v`), then **Push origin** again. Pushing the tag starts the build. Get the name right before pushing: GitHub Desktop can't delete a tag once it's pushed, and Windows treats `V0.16.1-beta` and `v0.16.1-beta` as the same name.
+4. On github.com, open the **Actions** tab. The *Build and release* run takes about 3–5 minutes. When it turns green, the **Releases** page has `AwesomeHouse-Beta-0.16.1.zip` and `SHA256SUMS.txt`. Beta versions are marked *Pre-release* automatically.
+5. Open the new release, click **Edit**, and add the "What's new" notes under the download section. The build writes only the download and checking part.
+6. Optional: upload the zip to [virustotal.com](https://www.virustotal.com/) and paste the result link into the release notes (Edit release).
+7. Send friends the **Releases page link** (github.com/kadestclair-dotcom/awesome-house/releases), not the zip itself.
 
 To test a build without publishing, use **Actions › Build and release › Run workflow**. The zip appears under *Artifacts* on that run's page.
 

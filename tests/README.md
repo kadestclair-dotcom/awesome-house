@@ -25,7 +25,7 @@ expected next to what it got.
 | File | What it checks |
 |---|---|
 | `test_parsing.py` | Gold amounts (`1g 50s`), catch lists, reagent lists, drop tables, item-name matching, Blizzard's loose field formats |
-| `test_item_lookup.py` | The Beta 0.14 name bug ("Heavy Leather" → Dwarven Leather Pants): paging, exact matches, cache self-repair, and the shipped `item_cache.json` |
+| `test_item_lookup.py` | The Beta 0.14 name bug ("Heavy Leather" → Dwarven Leather Pants): paging, exact matches, cache self-repair, and that no item data ships with the app |
 | `test_prices.py` | Price summary math, the Forever auction download (several houses, duplicates, commodities), history and trends, the sell helper, best time to sell, the flip finder, crafting profit, fishing, CSV export, login token |
 | `test_character.py` | Reading a character, armor, weapon, shield and dual-wield rules for every class, Efficiency scoring, the upgrade tables |
 | `test_monsters.py` | The QuestieDB decoder (CBOR/TOC), waypoints, factions incl. Skyborne, spawn spots, every Compendium lookup, loading and update checks |

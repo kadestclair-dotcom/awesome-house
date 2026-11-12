@@ -1,10 +1,10 @@
 @echo off
 rem Builds dist\AwesomeHouse.exe from the files in this folder, then puts it in
 rem share_package\Awesome House\ (with README, LICENSE and the About PDF) and
-rem zips that folder as AwesomeHouse-Beta-0.16.zip, ready to send.
+rem zips that folder as AwesomeHouse-Beta-0.16.1.zip, ready to send.
 setlocal
 set APPNAME=AwesomeHouse
-set VERSION=Beta-0.16
+set VERSION=Beta-0.16.1
 set PKG=share_package\Awesome House
 cd /d "%~dp0"
 findstr /c:"YOUR_PAYPAL_NAME" wow_price_gui.pyw >nul && (

@@ -1,5 +1,5 @@
-Awesome House  -  Beta 0.16
-===========================
+Awesome House  -  Beta 0.16.1
+=============================
 Know what it's worth before you list it.
 Copyright (c) 2026 Kade. All rights reserved. Free for personal use.
 
@@ -18,6 +18,10 @@ WHAT'S IN THIS FOLDER
   About Awesome House.pdf             Feature tour, privacy and limits (opens in any PDF viewer)
   README.txt                          This file
   LICENSE.txt                         What you can and can't do with the app
+  PRIVACY.txt                         What the app stores and what it sends, and to whom
+  THIRD-PARTY-NOTICES.txt             Licenses of the parts built into the app
+  PYTHON-LICENSE.txt                  Python's license (Python, OpenSSL, Tcl/Tk and more)
+  FONTS-LICENSE.txt                   License of the pixel fonts
 
 
 WHAT IT DOES
@@ -90,6 +94,14 @@ GET STARTED (about 5 minutes)
      Leave the app open and it checks prices again every hour.
 
 
+UPDATING FROM AN OLDER VERSION
+------------------------------
+  Close the app, then unzip the new version over your old Awesome House
+  folder and let it replace the files. Your key, watchlist, characters and
+  other lists are kept: they live in their own files next to the exe, and
+  the zip doesn't contain any of them.
+
+
 CHECK YOUR DOWNLOAD
 -------------------
   Only download Awesome House from its official page:
@@ -111,6 +123,9 @@ YOUR PRIVACY
   - The app never asks for your Battle.net password.
   - Your key, watchlist, characters, guide progress, price history and tracked
     monsters are saved only on your computer, in the app's folder.
+  - Data from Blizzard (prices, price history, item names and stats, character
+    and quest details) is deleted after 30 days and fetched again when needed.
+    Your own lists are never deleted.
   - The app talks to Blizzard's servers, and to GitHub only to download the
     free QuestieDB monster data: once when you first open the Monster
     Compendium (it asks first, about 14 MB) and when you click Update data.
