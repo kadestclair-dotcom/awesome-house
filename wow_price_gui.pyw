@@ -1,5 +1,5 @@
 """
-Awesome House (Beta 0.15) - the window app for wow_price.py
+Awesome House (Beta 0.16) - the window app for wow_price.py
 Keep this file in the same folder as wow_price.py and double-click it to open.
 
 Features: price lookup, watchlist with Day/Week/Month trends, price history chart,
@@ -40,7 +40,7 @@ RELEASES_URL = "https://github.com/kadestclair-dotcom/awesome-house/releases"   
 PRIVACY_URL = "https://github.com/kadestclair-dotcom/awesome-house/blob/main/PRIVACY.md"   # Blizzard API Terms 2.15
 BUG_EMAIL = "kadestclair@gmail.com"
 APP_NAME = "Awesome House"
-APP_VERSION = "Beta 0.15"
+APP_VERSION = "Beta 0.16"
 
 
 # ================================================================ pixel-art WoW theme

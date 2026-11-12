@@ -30,7 +30,7 @@ The printed hash should match the zip's line in `SHA256SUMS.txt` on the release.
 **Build record (GitHub CLI):**
 
 ```powershell
-gh attestation verify .\AwesomeHouse-Beta-0.15.zip --repo kadestclair-dotcom/awesome-house
+gh attestation verify .\AwesomeHouse-Beta-0.16.zip --repo kadestclair-dotcom/awesome-house
 ```
 
 A successful check means the file was built by this repository's workflow, not uploaded by a person.

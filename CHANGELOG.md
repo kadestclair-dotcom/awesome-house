@@ -1,6 +1,15 @@
 # Changelog
 
-## Beta 0.15 — compliance with Blizzard's Developer API Terms (Nov 12 2026)
+## Beta 0.16 — Windows fix (Nov 12 2026)
+
+- **Monster data updates no longer leave a `QuestieDB-Forever.zip.new` file behind on Windows.** The
+  downloaded zip was never closed, and Windows can't delete a file that is still open. It is now always
+  closed, whether the update works or not.
+- Beta 0.16 is the first release with everything below. (The Beta 0.15 download was built before these
+  changes and still bundled Blizzard item data.)
+- Tests: 374 passed, 9 skipped (Linux, Python 3.12 and 3.10, GUI included); the GitHub Windows run is green.
+
+## Beta 0.16 — compliance with Blizzard's Developer API Terms (Nov 12 2026)
 
 From the licenses and permissions check. Section numbers are the items under Section 2 of Blizzard's
 Developer API Terms of Use (last updated Oct 1 2019).
@@ -44,7 +53,7 @@ On a copy of the working folder's data, the first cleanup removes 3,297 item nam
 27 name lookups, 1 recent character lookup and 1 cached quest text (all unstamped). It keeps all 459 price
 points (under 30 days old), the saved Progress character and the 17-item watchlist.
 
-## Beta 0.15 — hardening, Phase A: correctness and data safety (Nov 12 2026)
+## Beta 0.16 — hardening, Phase A: correctness and data safety (Nov 12 2026)
 
 Nothing changes on screen except one new status-bar note (A8). File names and file formats are the
 same as before, so existing setups keep working. The finding IDs (D1…) refer to the hardening review.

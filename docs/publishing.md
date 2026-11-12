@@ -23,11 +23,11 @@ A one-time setup, then about two minutes per release. These steps use **GitHub D
 ## Making a release
 
 1. Put the new version number in two places:
-   - `APP_VERSION` near the top of `wow_price_gui.pyw` (e.g. `"Beta 0.15"`)
-   - `VERSION` in `build_exe.bat` (e.g. `Beta-0.15`), for local builds
+   - `APP_VERSION` near the top of `wow_price_gui.pyw` (e.g. `"Beta 0.16"`)
+   - `VERSION` in `build_exe.bat` (e.g. `Beta-0.16`), for local builds
 2. In GitHub Desktop, commit the changes with a short summary, then **Push origin**.
-3. **Repository › Create tag…**, name it like `v0.15-beta`, then **Push origin** again. Pushing the tag starts the build.
-4. On github.com, open the **Actions** tab. The *Build and release* run takes about 3–5 minutes. When it turns green, the **Releases** page has `AwesomeHouse-Beta-0.15.zip` and `SHA256SUMS.txt`. Beta versions are marked *Pre-release* automatically.
+3. **Repository › Create tag…**, name it like `v0.16-beta`, then **Push origin** again. Pushing the tag starts the build.
+4. On github.com, open the **Actions** tab. The *Build and release* run takes about 3–5 minutes. When it turns green, the **Releases** page has `AwesomeHouse-Beta-0.16.zip` and `SHA256SUMS.txt`. Beta versions are marked *Pre-release* automatically.
 5. Optional: upload the zip to [virustotal.com](https://www.virustotal.com/) and paste the result link into the release notes (Edit release).
 6. Send friends the **Releases page link** (github.com/kadestclair-dotcom/awesome-house/releases), not the zip itself.
 
