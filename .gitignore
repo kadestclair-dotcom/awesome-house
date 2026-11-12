@@ -11,6 +11,15 @@ guide_progress.json
 monster_tracking.json
 character_progress.json
 guides/
+# backups and damaged copies made by safe saves (they can hold the API secret), and the log
+*.bak
+*.corrupt-*
+*.tmp
+*.log
+# per-user caches of Blizzard data: fetched with each user's own key, kept 30 days, never shipped
+item_info.json
+item_stats.json
+item_cache.json
 
 # ---- build output (GitHub builds releases itself) ----
 build/
@@ -28,3 +37,4 @@ __pycache__/
 ah_diagnosis.txt
 diagnose_ah.py
 run_diagnosis.bat
+.pytest_cache/

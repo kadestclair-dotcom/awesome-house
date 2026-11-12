@@ -28,7 +28,7 @@ QINFO_PATH = wp.os.path.join(wp.CACHE_DIR, "forever_quest_info.json")
 def _opt(api, path, missing):
     try:
         return api.get(path, "profile") or {}
-    except (wp.ApiError, SystemExit):
+    except (wp.ApiError, wp.NetworkError, SystemExit):
         missing.append(path.rsplit("/character/", 1)[-1].split("/", 1)[-1])
         return {}
 
@@ -137,7 +137,7 @@ def quest_info(qid):
         data = wp.load_json(QINFO_PATH, {})
         _qinfo = data if isinstance(data, dict) else {}
     if str(qid) in _qinfo:
-        return _qinfo[str(qid)]
+        return {k: v for k, v in _qinfo[str(qid)].items() if k != "at"}
     try:
         d = wp.connect("forever").get(f"/data/wow/quest/{qid}", "static") or {}
     except wp.ApiError as e:
@@ -158,10 +158,33 @@ def quest_info(qid):
             "money": money if isinstance(money, (int, float)) else 0, "items": items[:8]}
     if not any(info.values()):
         info = {}
-    _qinfo[str(qid)] = info
+    _qinfo[str(qid)] = {**info, "at": int(time.time())}
     wp.os.makedirs(wp.CACHE_DIR, exist_ok=True)
     wp.save_json(QINFO_PATH, _qinfo)
     return info
+
+
+def enforce_data_ttl(now=None):
+    """Blizzard Developer API Terms 2.18: drop saved characters and quest text older than wp.DATA_TTL."""
+    global _qinfo
+    cutoff = (now or time.time()) - wp.DATA_TTL
+    removed = 0
+    data = wp.load_json(QINFO_PATH, None)
+    if isinstance(data, dict):
+        keep = {k: v for k, v in data.items() if wp._fresh(v, cutoff)}
+        if len(keep) != len(data):
+            removed += len(data) - len(keep)
+            wp.save_json(QINFO_PATH, keep)
+    _qinfo = None
+    saved = load_saved()
+    keep = {k: c for k, c in saved["chars"].items() if wp._fresh(c, cutoff, "fetched")}
+    if len(keep) != len(saved["chars"]):
+        removed += len(saved["chars"]) - len(keep)
+        saved["chars"] = keep
+        if saved.get("last") not in keep:
+            saved["last"] = max(keep, key=lambda k: keep[k].get("fetched", 0), default=None)
+        wp.save_json(PROGRESS_PATH, saved)
+    return removed
 
 
 def key_of(snap):
@@ -202,7 +225,7 @@ def refresh_all():
         try:
             save(fetch(old["name"], old.get("surname") or None))
             ok += 1
-        except (wp.ApiError, SystemExit, OSError):
+        except (wp.ApiError, wp.NetworkError, SystemExit, OSError):
             failed.append(f"{old['name']} {old.get('surname', '')}".strip())
     data = load_saved()
     if last in data["chars"]:
@@ -504,7 +527,7 @@ def guild_crafters(slug, progress=None, force=False, max_members=400):
     def one(m):
         try:
             d = api.get(f"/profile/wow/character/{m['slug']}/professions", "profile")
-        except (wp.ApiError, SystemExit):
+        except (wp.ApiError, wp.NetworkError, SystemExit):
             return m, None
         profs = []
         for kind in ("primaries", "secondaries"):

@@ -25,6 +25,7 @@ import struct
 import time
 import urllib.request
 import zipfile
+import zlib
 
 import wow_price as wp
 
@@ -231,7 +232,8 @@ def _zip_urls(version):
     return urls
 
 
-def download(version=None, progress=print):
+def download(version=None, progress=print, dest=None):
+    """Download the Forever release zip to dest (default ZIP_PATH), whole or not at all."""
     version = version or latest_version() or FALLBACK_VERSION
     os.makedirs(DATA_DIR, exist_ok=True)
     last = None
@@ -240,10 +242,7 @@ def download(version=None, progress=print):
             progress(f"Downloading QuestieDB {version} for Forever (about 14 MB)...")
             _, data = _get(url, timeout=180)
             zipfile.ZipFile(io.BytesIO(data)).testzip()
-            tmp = ZIP_PATH + ".part"
-            with open(tmp, "wb") as f:
-                f.write(data)
-            os.replace(tmp, ZIP_PATH)
+            wp.atomic_write_bytes(dest or ZIP_PATH, data, backup=False)
             return version
         except Exception as e:            # try the other file name, then give up
             last = e
@@ -391,12 +390,25 @@ def _faction(mask):
     return ""
 
 
-def build_index(version=None, progress=print):
-    """Read the downloaded QuestieDB release and write a compact monster index."""
-    if not os.path.exists(ZIP_PATH):
+def build_index(version=None, progress=print, zip_path=None):
+    """Read a downloaded QuestieDB release (default ZIP_PATH) and write a compact monster index.
+    A release laid out in a way this version can't read raises DataError and leaves the saved index as it is
+    (QuestieDB's storage format is still changing; cf. Questie's own data-contract check)."""
+    zip_path = zip_path or ZIP_PATH
+    if not os.path.exists(zip_path):
         raise DataError("The QuestieDB data hasn't been downloaded yet.")
+    try:
+        return _build_index(version, progress, zip_path)
+    except DataError:
+        raise
+    except (KeyError, ValueError, IndexError, TypeError, AttributeError, zipfile.BadZipFile, zlib.error) as e:
+        raise DataError(f"This QuestieDB release is laid out in a way Awesome House doesn't understand yet "
+                        f"({type(e).__name__}: {e}). Your current monster data is kept.") from e
+
+
+def _build_index(version, progress, zip_path):
     progress("Reading monsters, drops and quests...")
-    zf = zipfile.ZipFile(ZIP_PATH)
+    zf = zipfile.ZipFile(zip_path)
     toc_name = next((n for n in zf.namelist() if n.endswith("QuestieDB_Forever.toc")), None) \
         or next((n for n in zf.namelist() if n.endswith(".toc")), None)
     if not toc_name:
@@ -583,10 +595,7 @@ def build_index(version=None, progress=print):
 
     idx = {"schema": INDEX_SCHEMA, "version": version, "built": int(time.time()),
            "zones": zones, "dungeons": dungeons, "allq": allq, "qzones": qzones, "npcs": npcs, "drops": drops, "items": items, "quests": quests}
-    tmp = INDEX_PATH + ".part"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(idx, f, separators=(",", ":"))
-    os.replace(tmp, INDEX_PATH)
+    wp.atomic_write_bytes(INDEX_PATH, json.dumps(idx, separators=(",", ":")).encode("utf-8"), backup=False)
     return idx
 
 
@@ -777,18 +786,40 @@ def load(progress=print, update=False):
             have, _ = index_info()
             if update and latest and have == latest and os.path.exists(ZIP_PATH):
                 version = latest
+            elif os.path.exists(ZIP_PATH):
+                # an update: the old zip stays until the new release has been read successfully
+                new = ZIP_PATH + ".new"
+                try:
+                    version = download(latest, progress, dest=new)
+                    idx = build_index(version, progress, zip_path=new)
+                    wp._replace(new, ZIP_PATH)
+                finally:
+                    if os.path.exists(new):
+                        try:
+                            os.remove(new)
+                        except OSError:
+                            pass
             else:
                 version = download(latest, progress)
-        idx = build_index(version, progress)
+        if idx is None:
+            idx = build_index(version, progress)
     _loaded = Compendium(idx)
     return _loaded
 
 
+def version_tuple(text):
+    """"v1.0.14" -> (1, 0, 14); None when the text holds no version number."""
+    m = re.match(r"\s*v?(\d+(?:\.\d+)*)", text or "")
+    return tuple(int(p) for p in m.group(1).split(".")) if m else None
+
+
 def newer_release():
-    """The latest QuestieDB version if it is newer than ours, else None."""
+    """The latest QuestieDB version if it is newer than ours, else None.
+    Compared as numbers ("1.0.10" is newer than "1.0.9"); an unreadable version never counts as newer."""
     have, _ = index_info()
     latest = latest_version()
-    return latest if latest and have and latest != have else None
+    new, old = version_tuple(latest), version_tuple(have)
+    return latest if new and old and new > old else None
 
 
 # ================================================================ tracking list

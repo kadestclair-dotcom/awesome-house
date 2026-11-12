@@ -43,16 +43,24 @@ NO WARRANTY
 THIRD PARTIES
   - The app uses Blizzard's Developer API with each user's own API client.
     Use of that API is also subject to Blizzard's Developer API Terms of Use.
-  - World of Warcraft is a trademark of Blizzard Entertainment, Inc. Awesome
-    House is a fan-made tool, not affiliated with or endorsed by Blizzard.
-  - The Monster Compendium uses QuestieDB (github.com/Questie/QuestieDB), the
-    Questie addon's community database. It is not part of this repository or
-    the release packages: the app downloads it from GitHub on the user's
-    computer when the user chooses to, and it stays under its own authors'
-    terms.
+  - Auction, item and character data comes from Blizzard Entertainment's API.
+    Awesome House is a fan-made tool, not affiliated with or endorsed by
+    Blizzard. World of Warcraft and Blizzard Entertainment are trademarks or
+    registered trademarks of Blizzard Entertainment, Inc., in the U.S. and/or
+    other countries.
+  - The Monster Compendium, Dungeons and Progress tabs use QuestieDB
+    (github.com/Questie/QuestieDB), the Questie addon's community database,
+    made by the Questie team and contributors and used with the Questie team's
+    permission. It is not part of this repository or the release packages: the
+    app downloads it from GitHub on the user's computer when the user chooses
+    to, and it stays under QuestieDB's own license:
+    https://github.com/Questie/QuestieDB/blob/master/LICENSE.md
   - The Pixelify Sans and VT323 fonts built into the app are licensed under
     the SIL Open Font License 1.1. See FONTS-LICENSE.txt. That license covers
     only the fonts.
+  - The app is built with Python, OpenSSL, Tcl/Tk and other third-party
+    software, each under its own license. See THIRD-PARTY-NOTICES.txt and
+    PYTHON-LICENSE.txt in the release package.
 
 ENDING
   Your permission to use the app ends automatically if you break these terms.

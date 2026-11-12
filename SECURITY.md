@@ -43,6 +43,8 @@ A successful check means the file was built by this repository's workflow, not u
 
 There's no telemetry and no account. Everything else stays in the app's folder.
 
+Full details are in the [privacy policy](PRIVACY.md).
+
 ## Antivirus false positives
 
 Apps packed with PyInstaller are sometimes flagged by antivirus programs even when they're clean. If that happens, please don't turn your antivirus off or add an exception for a file you can't verify. Compare the checksum and build record above, and feel free to upload the file to [VirusTotal](https://www.virustotal.com/) for a second opinion.

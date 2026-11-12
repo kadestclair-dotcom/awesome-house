@@ -15,7 +15,7 @@ findstr /c:"YOUR_PAYPAL_NAME" wow_price_gui.pyw >nul && (
 set PY=python
 where py >nul 2>nul && set PY=py
 %PY% -m pip install --upgrade pyinstaller
-%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --name %APPNAME% --icon ah_coin_icon.ico --add-data "ah_coin_icon.ico;." --add-data "item_info.json;." --add-data "item_stats.json;." --add-data "item_cache.json;." --add-data "dungeon_travel.json;." wow_price_gui.pyw
+%PY% -m PyInstaller --noconfirm --clean --onefile --windowed --name %APPNAME% --icon ah_coin_icon.ico --add-data "ah_coin_icon.ico;." --add-data "dungeon_travel.json;." wow_price_gui.pyw
 echo.
 if not exist dist\%APPNAME%.exe (
   echo Build failed - see the messages above.
@@ -28,7 +28,11 @@ rem ---- share package: exe + README + LICENSE + About PDF, no personal files
 if not exist "%PKG%" mkdir "%PKG%"
 if exist package\README.txt copy /y package\*.* "%PKG%\" >nul
 copy /y dist\%APPNAME%.exe "%PKG%\%APPNAME%.exe" >nul
-for %%F in ("README.txt" "LICENSE.txt" "About Awesome House.pdf") do (
+rem Python's own LICENSE.txt holds the licenses of Python, OpenSSL, Tcl/Tk etc. built into the exe
+set PYLIC=
+for /f "usebackq delims=" %%P in (`%PY% -c "import sys,os;print(os.path.join(sys.base_prefix,'LICENSE.txt'))"`) do set PYLIC=%%P
+if exist "%PYLIC%" (copy /y "%PYLIC%" "%PKG%\PYTHON-LICENSE.txt" >nul) else (echo Warning: Python's LICENSE.txt was not found - the package needs PYTHON-LICENSE.txt.)
+for %%F in ("README.txt" "LICENSE.txt" "THIRD-PARTY-NOTICES.txt" "PYTHON-LICENSE.txt" "About Awesome House.pdf") do (
   if not exist "%PKG%\%%~F" echo Warning: %PKG%\%%~F is missing.
 )
 if exist "%APPNAME%-%VERSION%.zip" del "%APPNAME%-%VERSION%.zip"

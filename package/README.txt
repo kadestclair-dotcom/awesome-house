@@ -106,6 +106,7 @@ CHECK YOUR DOWNLOAD
 
 YOUR PRIVACY
 ------------
+  The full privacy policy is in PRIVACY.txt, next to the app.
   - You use your own free Blizzard API key. Nobody else's key is in this app.
   - The app never asks for your Battle.net password.
   - Your key, watchlist, characters, guide progress, price history and tracked
@@ -172,7 +173,11 @@ LICENSE IN SHORT
   Full terms are in LICENSE.txt.
 
 
+Auction, item and character data comes from Blizzard Entertainment's API.
 Awesome House is a fan-made tool. Not affiliated with or endorsed by Blizzard Entertainment.
-World of Warcraft is a trademark of Blizzard Entertainment, Inc.
-Monster Compendium and Dungeons data: QuestieDB (github.com/Questie/QuestieDB), downloaded separately.
+World of Warcraft and Blizzard Entertainment are trademarks or registered trademarks of
+Blizzard Entertainment, Inc., in the U.S. and/or other countries.
+Monster Compendium, Dungeons and Progress data: QuestieDB (github.com/Questie/QuestieDB)
+by the Questie team and contributors, used with their permission. Downloaded separately;
+it stays under QuestieDB's license: https://github.com/Questie/QuestieDB/blob/master/LICENSE.md
 Pixel fonts Pixelify Sans and VT323 are used under the SIL Open Font License 1.1.

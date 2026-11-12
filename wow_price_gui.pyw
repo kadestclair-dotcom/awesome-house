@@ -37,6 +37,7 @@ AUTO_CHECK_MS = 61 * 60 * 1000   # Blizzard refreshes data about hourly
 COPYRIGHT = "\u00a9 2026 Kade. All rights reserved."
 DONATE_URL = "https://paypal.me/keedoyesyes"
 RELEASES_URL = "https://github.com/kadestclair-dotcom/awesome-house/releases"   # the official download page
+PRIVACY_URL = "https://github.com/kadestclair-dotcom/awesome-house/blob/main/PRIVACY.md"   # Blizzard API Terms 2.15
 BUG_EMAIL = "kadestclair@gmail.com"
 APP_NAME = "Awesome House"
 APP_VERSION = "Beta 0.15"
@@ -89,9 +90,8 @@ def register_fonts():
         paths = []
         for name, chunks in FONT_DATA.items():
             path = os.path.join(folder, name)
-            if not os.path.exists(path):
-                with open(path, "wb") as f:
-                    f.write(base64.b64decode("".join(chunks)))
+            if not os.path.exists(path):           # written whole or not at all, so never half a font
+                wp.atomic_write_bytes(path, base64.b64decode("".join(chunks)), backup=False)
             paths.append(path)
         if sys.platform == "win32":
             import ctypes
@@ -336,7 +336,7 @@ def capture(fn):
     except SystemExit as e:
         if e.code not in (None, 0):
             buf.write(f"\n{e.code}")
-    except wp.ApiError as e:
+    except (wp.ApiError, wp.NetworkError) as e:
         buf.write(f"\n{e}")
     except Exception as e:
         buf.write(f"\nSomething went wrong: {e}")
@@ -776,6 +776,7 @@ class App:
                           command=lambda: webbrowser.open_new_tab(RELEASES_URL))
         helpm.add_separator()
         helpm.add_command(label="About and license...", command=self.open_about)
+        helpm.add_command(label="Privacy policy...", command=self.open_privacy)
         menubar.add_cascade(label="Help", menu=helpm)
         root.config(menu=menubar)
 
@@ -826,6 +827,7 @@ class App:
         root.after(100, self.poll_results)
         root.after(1000, self.load_categories)
         root.after(3000, self.auto_check)
+        root.after(1500, self.sweep_old_data)
 
     # ------------------------------------------------------------ layout
     def _build_search_tab(self):
@@ -1031,6 +1033,8 @@ class App:
                                    "item ID from Wowhead, or search All categories.")
                 return
             self.cards.show(result, game)
+            if wp.snapshot_note():
+                self.set_status()
 
         cid, sid = (scope[0], scope[1]) if scope else (None, None)
         self.in_background(lambda: capture(lambda: wp.lookup_items(
@@ -1053,6 +1057,8 @@ class App:
                 self.cards.message(f"Nothing in {label} is listed on the auction house right now.")
                 return
             self.cards.show(result, game)
+            if wp.snapshot_note():
+                self.set_status()
 
         self.in_background(lambda: capture(lambda: wp.browse_category(
             wp.connect(game), cid, sid, cname, sname)), done)
@@ -1241,6 +1247,9 @@ class App:
             parts.append(f"{alerts} alert{'s' if alerts != 1 else ''} active")
         if extra:
             parts.append(extra)
+        note = wp.snapshot_note()               # e.g. "14 of 15 auction houses answered - ..."
+        if note:
+            parts.append(note)
         self.status.config(text="  ·  ".join(parts))
 
     def selected_watch(self):
@@ -1283,7 +1292,8 @@ class App:
             self.refresh_list()
         if show:
             self.render_table(rows, game)
-        fired = self.evaluate_alerts(rows)
+        # with auction houses missing, a price can look higher than it is: alerts wait for whole data
+        fired = [] if any(r.get("partial") for r in rows) else self.evaluate_alerts(rows)
         for msg in fired:
             Toast(self.root, msg)
         self.set_status(f"{len(fired)} alert{'s' if len(fired) != 1 else ''} triggered" if fired else None)
@@ -1352,8 +1362,22 @@ class App:
             wp.save_watchlist(self.watch)
         return fired
 
+    def sweep_old_data(self):
+        """Delete Blizzard data older than 30 days (Blizzard Developer API Terms 2.18), in the background."""
+        self._last_sweep = time.time()
+
+        def work():
+            try:
+                return (wp.enforce_data_ttl() or 0) + (wpg.enforce_data_ttl() or 0)
+            except Exception:
+                wp.log.exception("couldn't clean up old Blizzard data")
+                return 0
+        self.in_background(work, lambda _n: None)
+
     def auto_check(self):
         self.root.after(AUTO_CHECK_MS, self.auto_check)
+        if time.time() - getattr(self, "_last_sweep", 0) > 86400:     # once a day while the app stays open
+            self.sweep_old_data()
         if not self.watch:
             return
         game = self.game_key()
@@ -1429,6 +1453,10 @@ class App:
             "Screenshots help a lot. Please don't include your Client Secret.",
             parent=self.root)
 
+    def open_privacy(self):
+        """The privacy policy (also PRIVACY.txt next to the app)."""
+        webbrowser.open_new_tab(PRIVACY_URL)
+
     def open_about(self):
         messagebox.showinfo(
             f"About {APP_NAME}",
@@ -1439,10 +1467,15 @@ class App:
             "Full terms are in LICENSE.txt next to the app.\n\n"
             "If it saves you gold, you can support the project at:\n" + DONATE_URL + "\n"
             "Donations are optional and don't unlock anything.\n\n"
-            "Monster Compendium and Dungeons data comes from QuestieDB (github.com/Questie/QuestieDB), "
-            "the Questie addon's community database. It is downloaded from GitHub on your "
-            "computer and isn't part of this app.\n\n"
-            "Fan-made. Not affiliated with or endorsed by Blizzard Entertainment.",
+            "Monster Compendium, Dungeons and Progress data comes from QuestieDB "
+            "(github.com/Questie/QuestieDB), the Questie addon's community database by the Questie team and "
+            "contributors, used with their permission. It is downloaded from GitHub on your computer, isn't "
+            "part of this app, and stays under QuestieDB's license: "
+            "github.com/Questie/QuestieDB/blob/master/LICENSE.md\n\n"
+            "Auction, item and character data comes from Blizzard Entertainment's API.\n"
+            "Fan-made. Not affiliated with or endorsed by Blizzard Entertainment.\n"
+            "World of Warcraft and Blizzard Entertainment are trademarks or registered trademarks of "
+            "Blizzard Entertainment, Inc., in the U.S. and/or other countries.",
             parent=self.root)
 
     def open_professions(self):
@@ -3476,6 +3509,12 @@ RANK_COLORS = {"Elite": GOLD, "Rare Elite": "#e6cc80", "Rare": "#d9d9e3", "Boss"
 PRICE_TTL = 55 * 60
 
 
+def prices_status(ts):
+    """'AH prices from 3:05 PM', plus a warning when some auction houses didn't answer."""
+    note = wp.snapshot_note()
+    return f"AH prices from {clock(ts)}" + (f"  ·  {note}" if note else "")
+
+
 def wiki_url(name):
     return wm.WIKI_PAGE.format(urllib.parse.quote(name.replace(" ", "_")))
 
@@ -3736,7 +3775,7 @@ class MonsterTab(ttk.Frame):
                 self.set_status("Couldn't load AH prices" + (f": {err.splitlines()[-1]}" if err else ""))
                 return
             self.sources, self.sources_ts = sources, time.time()
-            self.set_status(f"AH prices from {clock(self.sources_ts)}")
+            self.set_status(prices_status(self.sources_ts))
             self.fill_monsters(keep=True)
             self.show_detail()
 
@@ -4330,7 +4369,7 @@ class DungeonTab(MonsterTab):
         if not force and mt.sources is not None and time.time() - mt.sources_ts < PRICE_TTL:
             if self.sources is not mt.sources:
                 self.sources, self.sources_ts = mt.sources, mt.sources_ts
-                self.set_status(f"AH prices from {clock(self.sources_ts)}")
+                self.set_status(prices_status(self.sources_ts))
                 self.fill_monsters(keep=True)
                 self.show_detail()
             return
@@ -6977,15 +7016,6 @@ def ask_credentials(root):
     btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(12, 0))
     ttk.Button(btns, text="Quit", command=dlg.destroy).pack(side="right")
     ttk.Button(btns, text="Save", command=save).pack(side="right", padx=6)
-    support = ttk.Frame(frm)
-    support.grid(row=5, column=0, columnspan=2, sticky="w", pady=(14, 0))
-    ttk.Label(support, justify="left", wraplength=380, text=(
-        "This app is free. If it turns out to be useful to you, please consider "
-        "supporting the project:")).pack(anchor="w")
-    link = ttk.Label(support, text=DONATE_URL.replace("https://", ""), foreground=GOLD_EDGE,
-                     cursor="hand2", font=F(10, "underline"))
-    link.pack(anchor="w", pady=(2, 0))
-    link.bind("<Button-1>", lambda e: webbrowser.open_new_tab(DONATE_URL))
     dlg.bind("<Return>", lambda e: save())
     dlg.protocol("WM_DELETE_WINDOW", dlg.destroy)
     e1.focus_set()

@@ -29,12 +29,17 @@ Notes on WoW: Forever:
 import argparse
 import base64
 import csv
+import http.client
 import json
+import logging
 import os
+import random
 import re
+import shutil
 import sqlite3
 import statistics
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -50,17 +55,16 @@ else:
     HERE = os.path.dirname(os.path.abspath(__file__))
     BUNDLE_DIR = HERE
 
-# Ship these read-mostly lookup tables with the exe; copy them out on first run.
-for _seed in ("item_info.json", "item_stats.json", "item_cache.json"):
-    _src, _dst = os.path.join(BUNDLE_DIR, _seed), os.path.join(HERE, _seed)
-    if _src != _dst and os.path.exists(_src) and not os.path.exists(_dst):
-        try:
-            import shutil
-            shutil.copyfile(_src, _dst)
-        except OSError:
-            pass
+# No Blizzard data ships with the app (Blizzard Developer API Terms 2.5 and 2.18): item names and stats
+# are fetched with each user's own API key and kept for at most 30 days.
+
+log = logging.getLogger("awesome_house")
 
 CONFIG_PATH = os.path.join(HERE, "wow_price_config.json")
+# Blizzard Developer API Terms 2.18: data from the API is kept for at most 30 days. Everything saved from
+# Blizzard carries the time it was fetched ("at", "fetched" or the price-history ts); enforce_data_ttl()
+# deletes what is older, and it is fetched again when needed.
+DATA_TTL = 30 * 86400
 CACHE_DIR = os.path.join(HERE, ".wow_price_cache")
 CACHE_SECONDS = 60 * 60
 
@@ -73,6 +77,12 @@ class ApiError(Exception):
     def __init__(self, code, msg):
         super().__init__(msg)
         self.code = code
+
+
+class NetworkError(Exception):
+    """Blizzard couldn't be reached (no connection, timeout, dropped download). Deliberately not an
+    ApiError: code that treats an ApiError as "Blizzard has no such data" and caches that must not
+    cache a network blip."""
 
 
 # ---------- helpers ----------
@@ -90,16 +100,143 @@ def fmt_gold(copper):
     return " ".join(parts)
 
 
-def http_json(url, headers=None, data=None):
-    req = urllib.request.Request(url, headers=headers or {}, data=data)
+# ---------- saving files safely ----------
+# A save writes a temporary file next to the real one and swaps it in (os.replace), so a crash,
+# power cut or full disk mid-save leaves the previous version whole. The user's own data also
+# keeps the previous good version as <name>.bak. A file that can't be read is kept as
+# <name>.corrupt-<time> and the .bak is used instead, so the next save can't wipe the user's data.
+# File names and formats are the same as before. (Patterns: Calibre commit_data/retry_on_fail,
+# Deluge Config.save, Thonny's .corrupt copies.)
+
+BACKUP_FILES = {"watchlist.json", "fishing_sessions.json", "characters.json", "recipes.json",
+                "fishing_spots.json", "guide_progress.json", "monster_tracking.json",
+                "character_progress.json"}
+REPLACE_TRIES = 10              # Windows: antivirus or the search indexer can hold a file for a moment
+REPLACE_WAIT = 0.2              # seconds between tries
+
+
+def _replace(src, dst):
+    for attempt in range(REPLACE_TRIES):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == REPLACE_TRIES - 1:
+                raise
+            time.sleep(REPLACE_WAIT)
+
+
+def atomic_write_bytes(path, data, backup=None):
+    """Write data to path all-or-nothing. backup=None: keep a .bak for the user's own data files."""
+    if backup is None:
+        backup = os.path.basename(path) in BACKUP_FILES
+    folder = os.path.dirname(os.path.abspath(path))
+    os.makedirs(folder, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(path) + ".", suffix=".tmp", dir=folder)
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:300]
-        raise ApiError(e.code, f"Blizzard API error {e.code} for {url.split('?')[0]}\n{body}")
-    except urllib.error.URLError as e:
-        raise SystemExit(f"Could not reach Blizzard API: {e.reason}")
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        if backup and os.path.exists(path):
+            try:
+                shutil.copyfile(path, path + ".bak")
+            except OSError as e:
+                log.warning("couldn't back up %s: %s", path, e)
+        _replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def atomic_write_json(path, data, indent=None, backup=None):
+    atomic_write_bytes(path, json.dumps(data, indent=indent).encode("utf-8"), backup=backup)
+
+
+def _set_aside(path):
+    """Keep a damaged file as <name>.corrupt-<time> instead of letting the next save overwrite it."""
+    dest = f"{path}.corrupt-{time.strftime('%Y%m%d-%H%M%S')}"
+    try:
+        os.replace(path, dest)
+        log.warning("%s couldn't be read; kept it as %s", path, dest)
+    except OSError as e:
+        log.warning("%s couldn't be read or set aside: %s", path, e)
+
+
+def read_json(path, default):
+    """Load a JSON file. Missing: default. Damaged: set aside, then the .bak copy if there is a good
+    one (it is put back in place), else default."""
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except ValueError:
+        _set_aside(path)
+    except OSError as e:
+        log.warning("couldn't read %s: %s", path, e)
+        return default
+    bak = path + ".bak"
+    try:
+        with open(bak, "rb") as f:
+            raw = f.read()
+        data = json.loads(raw.decode("utf-8"))
+    except (OSError, ValueError):
+        return default
+    try:
+        atomic_write_bytes(path, raw, backup=False)
+        log.warning("restored %s from its backup", path)
+    except OSError as e:
+        log.warning("couldn't restore %s from its backup: %s", path, e)
+    return data
+
+
+# ---------- talking to Blizzard ----------
+# Busy (429) and server errors (5xx) and dropped connections are retried with growing waits,
+# honoring Blizzard's Retry-After (urllib3 Retry semantics, stdlib only). Small calls give up sooner
+# than the multi-megabyte auction downloads. Each client has 36,000 requests an hour.
+
+TIMEOUT_SMALL = 30              # seconds: item, character, recipe... pages
+TIMEOUT_AUCTIONS = 120          # seconds: an auction house download can be tens of MB
+RETRY_TRIES = 3                 # attempts in all
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+RETRY_BACKOFF = 0.5             # seconds; doubles each retry, plus a little random jitter
+RETRY_AFTER_MAX = 30            # never wait longer than this, whatever Retry-After says
+ERROR_BODY_CHARS = 300          # how much of an error reply to show
+
+
+def _retry_wait(attempt, retry_after=None):
+    try:
+        if retry_after is not None:
+            return min(float(retry_after), RETRY_AFTER_MAX)
+    except ValueError:
+        pass                                    # an HTTP date instead of seconds: use the backoff
+    return RETRY_BACKOFF * 2 ** attempt + random.uniform(0, RETRY_BACKOFF / 2)
+
+
+def http_json(url, headers=None, data=None, timeout=TIMEOUT_SMALL):
+    """GET (or POST data) url and decode the JSON reply. Raises ApiError for an HTTP error reply,
+    NetworkError when Blizzard can't be reached; both only after the retries."""
+    for attempt in range(RETRY_TRIES):
+        last = attempt == RETRY_TRIES - 1
+        req = urllib.request.Request(url, headers=headers or {}, data=data)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            if e.code in RETRY_STATUSES and not last:
+                time.sleep(_retry_wait(attempt, e.headers.get("Retry-After") if e.headers else None))
+                continue
+            body = e.read().decode("utf-8", "replace")[:ERROR_BODY_CHARS]
+            raise ApiError(e.code, f"Blizzard API error {e.code} for {url.split('?')[0]}\n{body}")
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
+            if not last:
+                time.sleep(_retry_wait(attempt))
+                continue
+            raise NetworkError(f"Could not reach Blizzard API: {getattr(e, 'reason', None) or e}") from e
 
 
 def load_credentials():
@@ -117,8 +254,7 @@ def load_credentials():
     print("Create a client at https://develop.battle.net/access/clients, then paste below.")
     cid = input("Client ID: ").strip()
     secret = input("Client Secret: ").strip()
-    with open(CONFIG_PATH, "w") as f:
-        json.dump({"client_id": cid, "client_secret": secret}, f)
+    atomic_write_json(CONFIG_PATH, {"client_id": cid, "client_secret": secret})
     print(f"Saved to {CONFIG_PATH}\n")
     return cid, secret
 
@@ -135,17 +271,16 @@ def has_credentials():
 
 
 def save_credentials(cid, secret):
-    with open(CONFIG_PATH, "w") as f:
-        json.dump({"client_id": cid.strip(), "client_secret": secret.strip()}, f)
+    atomic_write_json(CONFIG_PATH, {"client_id": cid.strip(), "client_secret": secret.strip()})
 
 
-def get_token(cid, secret):
+def get_token(cid, secret, renew=False):
+    """An access token, from the cache while it's valid (renew=True: always a new one).
+    A damaged token cache just means asking Blizzard for a new token."""
     cache = os.path.join(CACHE_DIR, "token.json")
-    if os.path.exists(cache):
-        with open(cache) as f:
-            tok = json.load(f)
-        if tok.get("expires_at", 0) > time.time() + 60:
-            return tok["access_token"]
+    tok = {} if renew else read_json(cache, {})
+    if isinstance(tok, dict) and tok.get("access_token") and tok.get("expires_at", 0) > time.time() + 60:
+        return tok["access_token"]
     auth = base64.b64encode(f"{cid}:{secret}".encode()).decode()
     try:
         resp = http_json(
@@ -158,15 +293,15 @@ def get_token(cid, secret):
         raise SystemExit(f"Login to Blizzard API failed - check your Client ID/Secret.\n{e}")
     tok = {"access_token": resp["access_token"],
            "expires_at": time.time() + resp.get("expires_in", 3600)}
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(cache, "w") as f:
-        json.dump(tok, f)
+    atomic_write_json(cache, tok)
     return tok["access_token"]
 
 
 class Blizz:
-    def __init__(self, token, region, game):
+    def __init__(self, token, region, game, renew=None):
         self.token = token
+        self.renew = renew              # () -> a new token, used once when Blizzard rejects ours (401)
+        self.partial = False            # True when the last auction snapshot is missing houses that didn't answer
         self.region = region
         self.game = game
         self.base = f"https://{region}.api.blizzard.com"
@@ -180,19 +315,32 @@ class Blizz:
     def get(self, path, kind, **params):
         params = {"namespace": self.ns(kind), "locale": "en_US", **params}
         url = f"{self.base}{path}?{urllib.parse.urlencode(params)}"
-        return http_json(url, headers={"Authorization": f"Bearer {self.token}"})
+        timeout = TIMEOUT_AUCTIONS if "/auctions" in path or path.endswith("/commodities") else TIMEOUT_SMALL
+        try:
+            return http_json(url, headers={"Authorization": f"Bearer {self.token}"}, timeout=timeout)
+        except ApiError as e:
+            if e.code != 401 or not self.renew:
+                raise
+            log.info("Blizzard rejected the access token; getting a new one")
+            self.token = self.renew()
+            return http_json(url, headers={"Authorization": f"Bearer {self.token}"}, timeout=timeout)
 
-    def cached(self, key, fetch):
+    def cached(self, key, fetch, keep=None):
+        """fetch() once per CACHE_SECONDS, saved under key. keep(data) False: use it but don't save it."""
         os.makedirs(CACHE_DIR, exist_ok=True)
         path = os.path.join(CACHE_DIR, f"{self.game}_{self.region}_{key}.json")
         if os.path.exists(path) and time.time() - os.path.getmtime(path) < CACHE_SECONDS:
-            self.snapshot_time = int(os.path.getmtime(path))
-            with open(path) as f:
-                return json.load(f)
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                self.snapshot_time = int(os.path.getmtime(path))
+                return data
+            except (OSError, ValueError):          # half-written or damaged: download it again
+                log.warning("cached snapshot %s couldn't be read; downloading it again", path)
         print(f"Downloading fresh auction snapshot ({key})... this can take a moment.")
         data = fetch()
-        with open(path, "w") as f:
-            json.dump(data, f)
+        if keep is None or keep(data):
+            atomic_write_json(path, data)
         self.snapshot_time = int(time.time())
         return data
 
@@ -243,7 +391,7 @@ def find_items(api, query, class_id=None, subclass_id=None):
     while page <= max_pages:
         try:
             res = api.get("/data/wow/search/item", "static", **params, _page=page)
-        except ApiError as e:
+        except ApiError as e:               # (a NetworkError is not caught: it is reported as one)
             if page == 1 and params["_pageSize"] == 1000:
                 params["_pageSize"] = 100            # some API versions cap the page size
                 continue
@@ -300,8 +448,7 @@ def _info_cache():
 
 
 def save_info():
-    with open(ITEM_INFO_PATH, "w") as f:
-        json.dump(_info_cache(), f)
+    atomic_write_json(ITEM_INFO_PATH, _info_cache())
 
 
 def remember_info(game, item_id, data, save=True, cls=None, sub=None):
@@ -313,7 +460,7 @@ def remember_info(game, item_id, data, save=True, cls=None, sub=None):
             "cls": _loc(c.get("name")) or cls, "sub": _loc(sc.get("name")) or sub,
             "q": q.get("type") if isinstance(q, dict) else None,
             "lvl": data.get("level"), "req": data.get("required_level"),
-            "buy": data.get("purchase_price"), "vsell": data.get("sell_price")}
+            "buy": data.get("purchase_price"), "vsell": data.get("sell_price"), "at": int(time.time())}
     _info_cache()[f"{game}:{item_id}"] = info
     if save:
         save_info()
@@ -452,9 +599,28 @@ def forever_house_list(api):
 
 
 _forever_memo = {}      # region -> (snapshot time, sources, gear ids): skip re-reading the big file
+_partial_memo = {}      # region -> (fetched at, sources, gear ids, answered, total): a snapshot missing houses
+_houses = {}            # region -> (houses that answered, houses) for the latest snapshot
+PARTIAL_RETRY_SECONDS = 5 * 60   # a snapshot missing houses is reused this long, then asked for again
+
+
+def snapshot_note(region="us"):
+    """A short warning for the status bar when the latest auction data is missing houses, else None."""
+    answered, total = _houses.get(region, (0, 0))
+    if total and answered < total:
+        return f"{answered} of {total} auction houses answered - prices may be incomplete"
+    return None
+
+
+def _house_failed(e):
+    """A house counts as not answering on a network failure or an error other than 404 (no such data)."""
+    return isinstance(e, NetworkError) or getattr(e, "code", None) != 404
 
 
 def forever_sources(api):
+    """Every Forever auction house's listings: [(label, {item id: [(price, qty)]})].
+    A house that doesn't answer (after retries) leaves the snapshot out of the hour-long cache and
+    out of price history, and is asked for again after PARTIAL_RETRY_SECONDS."""
     path = os.path.join(CACHE_DIR, f"{api.game}_{api.region}_forever_all_houses_v5.json")
     memo = _forever_memo.get(api.region)
     try:
@@ -462,8 +628,15 @@ def forever_sources(api):
     except OSError:
         mtime = None
     if memo and mtime == memo[0] and time.time() - mtime < CACHE_SECONDS:
-        api.snapshot_time, api.gear_ids = memo[0], memo[2]
+        api.snapshot_time, api.gear_ids, api.partial = memo[0], memo[2], False
+        n = len(memo[1])
+        _houses[api.region] = (n, n)
         return memo[1]
+    part = _partial_memo.get(api.region)
+    if part and time.time() - part[0] < PARTIAL_RETRY_SECONDS:
+        api.snapshot_time, api.gear_ids, api.partial = int(part[0]), part[2], True
+        _houses[api.region] = part[3:5]
+        return part[1]
 
     def fetch_all():
         base = f"/data/wow/ruleset/{FOREVER_RULESET}/auctions"
@@ -471,6 +644,8 @@ def forever_sources(api):
         def one(house):
             hid, name = house
             listings, seen, gear = [], set(), set()
+
+            failed = False
 
             def add(lst):
                 if not isinstance(lst, list):      # e.g. {"href": ...} links, not listings
@@ -489,8 +664,8 @@ def forever_sources(api):
 
             try:
                 d = api.get(f"{base}/{hid}", "dynamic")
-            except ApiError:
-                d = {}
+            except (ApiError, NetworkError) as e:
+                d, failed = {}, _house_failed(e)
             add(d.get("auctions"))
             add(d.get("commodities"))
             # The house call returns gear only, plus a *link* to the stackables
@@ -503,25 +678,32 @@ def forever_sources(api):
                     c = api.get(f"{base}/{hid}/commodities", "dynamic")
                     add(c.get("commodities"))
                     add(c.get("auctions"))
-                except ApiError:
-                    pass
+                except (ApiError, NetworkError) as e:
+                    failed = failed or _house_failed(e)
             if not has_gear:
                 try:
                     g = api.get(f"{base}/{hid}/auctions", "dynamic")
                     add(g.get("auctions"))
                     add(g.get("commodities"))
-                except ApiError:
-                    pass
+                except (ApiError, NetworkError) as e:
+                    failed = failed or _house_failed(e)
             gear.discard(None)
-            return {"id": hid, "name": name, "auctions": listings, "gear": sorted(gear)}
+            out = {"id": hid, "name": name, "auctions": listings, "gear": sorted(gear)}
+            if failed:
+                out["failed"] = True
+                log.warning("auction house %s (%s) didn't answer", hid, name)
+            return out
 
         # the houses don't depend on each other, so ask for several at once
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(5) as ex:
             return list(ex.map(one, forever_house_list(api)))
 
-    houses = api.cached("forever_all_houses_v5", fetch_all)
+    houses = api.cached("forever_all_houses_v5", fetch_all, keep=lambda hs: not any(h.get("failed") for h in hs))
     api.gear_ids = {i for h in houses for i in h.get("gear", [])}
+    answered = sum(1 for h in houses if not h.get("failed"))
+    api.partial = answered < len(houses)
+    _houses[api.region] = (answered, len(houses))
     counts = {}
     for h in houses:
         counts[h["name"]] = counts.get(h["name"], 0) + 1
@@ -532,6 +714,10 @@ def forever_sources(api):
         # several houses can share a name; add the number so they can be told apart
         label = f"{h['name']} #{h['id']}" if counts[h["name"]] > 1 else h["name"]
         sources.append((label, book))
+    if api.partial:
+        _partial_memo[api.region] = (time.time(), sources, api.gear_ids, answered, len(houses))
+        return sources
+    _partial_memo.pop(api.region, None)
     try:
         _forever_memo[api.region] = (int(os.path.getmtime(path)), sources, api.gear_ids)
     except OSError:
@@ -582,7 +768,7 @@ def lookup_items(api, query, limit=None, class_id=None, subclass_id=None):
     for e in missing:
         info = item_info(api, e["id"])
         e["cls"], e["sub"] = info.get("cls"), info.get("sub")
-    record_history(api.game, api.snapshot_time, [e for e in out if e["found"]])
+    record_history(api.game, api.snapshot_time, [e for e in out if e["found"]], api=api)
     res["items"] = out[:limit] if limit else out
     return res
 
@@ -620,7 +806,7 @@ def browse_category(api, class_id, subclass_id=None, cls_name=None, sub_name=Non
         if subclass_id is not None:
             e["sub"] = e["sub"] or sub_name
     out.sort(key=lambda e: (-(e.get("quantity") or 0), e["name"]))
-    record_history(api.game, api.snapshot_time, out)
+    record_history(api.game, api.snapshot_time, out, api=api)
     return {"query": category_label(cls_name, sub_name), "items": out, "total": len(out),
             "members": len(members), "ts": api.snapshot_time, "browse": True}
 
@@ -631,36 +817,29 @@ WATCHLIST_PATH = os.path.join(HERE, "watchlist.json")
 
 
 def load_watchlist():
-    if os.path.exists(WATCHLIST_PATH):
-        try:
-            with open(WATCHLIST_PATH) as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            pass
-    return []
+    return read_json(WATCHLIST_PATH, [])
 
 
 def save_watchlist(entries):
-    with open(WATCHLIST_PATH, "w") as f:
-        json.dump(entries, f, indent=2)
+    atomic_write_json(WATCHLIST_PATH, entries, indent=2)
 
 
 def connect(game="forever", region="us"):
     cid, secret = load_credentials()
-    return Blizz(get_token(cid, secret), region, game)
+    return Blizz(get_token(cid, secret), region, game, renew=lambda: get_token(cid, secret, renew=True))
 
 
-def local_item(game, query):
+def local_item(game, query, region="us"):
     """{'id', 'name'} for an exact item name the app has already seen, else None."""
     found = [(i, n) for i, n in _known_matches(game, norm_name(query).split()) if norm_name(n) == norm_name(query)]
-    return _pick(game, found)
+    return _pick(game, found, region)
 
 
-def _pick(game, items):
+def _pick(game, items, region="us"):
     """One of several items sharing a name: the one on the auction house now, else the lowest ID."""
     if not items:
         return None
-    memo = _forever_memo.get("us") if game == "forever" else None
+    memo = _forever_memo.get(region) if game == "forever" else None
     listed = [i for i in items if memo and any(i[0] in book for _l, book in memo[1])]
     item_id, name = min(listed or items)
     return {"id": item_id, "name": name}
@@ -673,10 +852,10 @@ def resolve_item(api, query):
     if query.isdigit():
         items = find_items(api, query)
         return {"id": items[0][0], "name": items[0][1]} if items else None
-    known = local_item(api.game, query)
+    known = local_item(api.game, query, api.region)
     if known:
         return known
-    return _pick(api.game, [i for i in find_items(api, query) if norm_name(i[1]) == norm_name(query)])
+    return _pick(api.game, [i for i in find_items(api, query) if norm_name(i[1]) == norm_name(query)], api.region)
 
 
 def get_sources(api, realm=None):
@@ -717,7 +896,9 @@ def check_watchlist(api, entries, realm=None):
         base = {"id": e["id"], "name": e["name"], "ts": ts,
                 "cls": info.get("cls"), "sub": info.get("sub")}
         rows.append({**base, "found": True, **s} if s else {**base, "found": False})
-    record_history(api.game, ts, rows)
+        if getattr(api, "partial", False):
+            rows[-1]["partial"] = True          # some auction houses didn't answer this time
+    record_history(api.game, ts, rows, api=api)
     add_trends(api.game, ts, rows)
     return rows
 
@@ -758,14 +939,18 @@ def _db():
     return con
 
 
-def record_history(game, ts, rows):
-    """Save one price point per item per auction snapshot (duplicates are ignored)."""
+def record_history(game, ts, rows, api=None):
+    """Save one price point per item per auction snapshot (duplicates are ignored).
+    Nothing is saved from a snapshot missing auction houses (api.partial): its prices aren't whole."""
+    if api is not None and getattr(api, "partial", False):
+        return
     data = [(ts, game, r["id"], int(r["lowest"]), int(round(r["cheap10"])), r["quantity"])
             for r in rows if r.get("found")]
     if not data:
         return
     with closing(_db()) as con, con:
         con.executemany("INSERT OR IGNORE INTO prices VALUES (?,?,?,?,?,?)", data)
+        con.execute("DELETE FROM prices WHERE ts < ?", (int(time.time() - DATA_TTL),))
 
 
 def price_history(game, item_id, since_ts):
@@ -804,22 +989,17 @@ ITEM_CACHE_PATH = os.path.join(HERE, "item_cache.json")
 def resolve_cached(api, query):
     """resolve_item, but remembers answers so repeat lookups skip the search."""
     key = f"{api.game}:{norm_name(query)}"
-    cache = {}
-    if os.path.exists(ITEM_CACHE_PATH):
-        try:
-            with open(ITEM_CACHE_PATH) as f:
-                cache = json.load(f)
-        except (OSError, ValueError):
-            cache = {}
+    cache = read_json(ITEM_CACHE_PATH, {})
+    if not isinstance(cache, dict):
+        cache = {}
     hit = cache.get(key)
     name = norm_name(query)
     if hit and (name.isdigit() or norm_name(hit.get("name")) == name):
-        return hit                 # (older versions could save a different item under a name)
+        return {"id": hit["id"], "name": hit["name"]}   # (older versions could save a different item under a name)
     entry = resolve_item(api, query)
     if entry:
-        cache[key] = entry
-        with open(ITEM_CACHE_PATH, "w") as f:
-            json.dump(cache, f, indent=1)
+        cache[key] = {**entry, "at": int(time.time())}
+        atomic_write_json(ITEM_CACHE_PATH, cache, indent=1)
     return entry
 
 
@@ -903,44 +1083,30 @@ def value_catch(api, catch):
         else:
             rows.append({**item, "found": False, "each": 0, "total": 0})
     if summaries:
-        record_history(api.game, api.snapshot_time, summaries)
+        record_history(api.game, api.snapshot_time, summaries, api=api)
     total = sum(r["total"] for r in rows)
     return {"rows": rows, "unresolved": unresolved, "total": total,
             "after_cut": total * (1 - AH_CUT), "ts": api.snapshot_time}
 
 
 def load_sessions():
-    if os.path.exists(SESSIONS_PATH):
-        try:
-            with open(SESSIONS_PATH) as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            pass
-    return []
+    return read_json(SESSIONS_PATH, [])
 
 
 def save_session(entry):
     sessions = load_sessions()
     sessions.append(entry)
-    with open(SESSIONS_PATH, "w") as f:
-        json.dump(sessions, f, indent=1)
+    atomic_write_json(SESSIONS_PATH, sessions, indent=1)
 
 
 # ---------- shared tool helpers ----------
 
 def load_json(path, default):
-    if os.path.exists(path):
-        try:
-            with open(path) as f:
-                return json.load(f)
-        except (OSError, ValueError):
-            pass
-    return default
+    return read_json(path, default)
 
 
 def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=1)
+    atomic_write_json(path, data, indent=1)
 
 
 def get_listings(sources, item_id):
@@ -989,7 +1155,7 @@ def sell_advice(api, query, my_qty=None, item=None):
     if not lst:
         return res
     s = summarize(lst)
-    record_history(api.game, ts, [{"id": item["id"], "found": True, **s}])
+    record_history(api.game, ts, [{"id": item["id"], "found": True, **s}], api=api)
 
     ladder, cum = [], 0
     for price, qty in lst:
@@ -1959,8 +2125,7 @@ def export_guide(profession):
     if not os.path.exists(path):
         g = load_guide(profession) or {"kind": "craft", "intro": "", "trainers": "", "steps": []}
         g.pop("custom", None)
-        with open(path, "w") as f:
-            json.dump(g, f, indent=2)
+        atomic_write_json(path, g, indent=2)
     return path
 
 
@@ -2206,116 +2371,6 @@ def get_character(api, name, surname=None, realm=None):
             "gear": gear, "game": api.game}
 
 
-def _member(d, inv_type=None):
-    g = parse_gear(d)
-    return {"id": d.get("id"), "name": _loc(d.get("name")), "ilvl": g["ilvl"],
-            "req": d.get("required_level", g["req"]), "sub_id": g["sub_id"], "q": g["q"],
-            "inv": g["inv"] or inv_type, "preview": parse_gear(d["preview_item"]) if d.get("preview_item") else None}
-
-
-def _search_all(api, params, max_pages):
-    out, page = [], 1
-    params = {**params, "orderby": "id", "_pageSize": 1000}
-    while page <= max_pages:
-        try:
-            res = api.get("/data/wow/search/item", "static", **params, _page=page)
-        except ApiError:
-            if page == 1 and params["_pageSize"] == 1000:
-                params["_pageSize"] = 100           # some API versions cap the page size
-                continue
-            break
-        out.extend(r.get("data", {}) for r in res.get("results", []))
-        if page >= (res.get("pageCount") or 1):
-            break
-        page += 1
-    return out
-
-
-def class_members(api, item_class):
-    """Every armor (4) or weapon (2) item, found by category alone. Cached a week once found."""
-    path = os.path.join(CACHE_DIR, f"{api.game}_{api.region}_gearclass_{item_class}.json")
-    if os.path.exists(path) and time.time() - os.path.getmtime(path) < RECIPE_SECONDS:
-        cached = load_json(path, [])
-        if cached:
-            return cached
-    out = [_member(d) for d in _search_all(api, {"item_class.id": item_class}, 20)]
-    if out:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        save_json(path, out)
-    return out
-
-
-def slot_members(api, item_class, inv_type):
-    """Every item of one inventory type. Tries the slot search first, then the whole category
-    filtered by slot. Only non-empty results are cached (for a week)."""
-    path = os.path.join(CACHE_DIR, f"{api.game}_{api.region}_slot2_{item_class}_{inv_type}.json")
-    if os.path.exists(path) and time.time() - os.path.getmtime(path) < RECIPE_SECONDS:
-        cached = load_json(path, [])
-        if cached:
-            return cached
-    out = [_member(d, inv_type) for d in
-           _search_all(api, {"item_class.id": item_class, "inventory_type.type": inv_type}, 10)]
-    out = [m for m in out if m["inv"] == inv_type]
-    if not out:
-        out = [m for m in class_members(api, item_class) if m["inv"] == inv_type]
-    if out:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        save_json(path, out)
-    return out
-
-
-def item_gear(api, item_id):
-    """Full stats for one item (from its preview). Cached permanently."""
-    cache = load_json(ITEM_STATS_PATH, {})
-    key = f"{api.game}:{item_id}"
-    if key in cache:
-        return cache[key] if not cache[key].get("missing") else None
-    try:
-        d = api.get(f"/data/wow/item/{item_id}", "static")
-    except ApiError as e:
-        if e.code == 404:             # Forever has no data for many Classic-era items
-            cache[key] = {"missing": True}
-            save_json(ITEM_STATS_PATH, cache)
-        return None
-    g = parse_gear(d.get("preview_item") or d)
-    base = parse_gear(d)
-    for k in ("ilvl", "req", "sub_id", "inv", "q"):
-        if g.get(k) is None:
-            g[k] = base.get(k)
-    if g["req"] is None:
-        g["req"] = d.get("required_level")
-    g["name"] = _loc(d.get("name"))
-    g["cls_id"] = (d.get("item_class") or {}).get("id")
-    cache[key] = g
-    save_json(ITEM_STATS_PATH, cache)
-    return g
-
-
-def ah_gear_pool(api, sources, progress=None, limit=400):
-    """Last resort: learn what gear is for sale by reading the listed items themselves.
-    Fetches up to `limit` not-yet-known items per scan; everything is cached for next time."""
-    cache = load_json(ITEM_STATS_PATH, {})
-    ids = set()
-    for _label, book in sources:
-        ids.update(book)
-    skip = {"Trade Goods", "Consumable", "Recipe", "Reagent", "Quest", "Container", "Projectile", "Quiver", "Key"}
-    todo = [i for i in ids if f"{api.game}:{i}" not in cache and cached_info(api.game, i).get("cls") not in skip]
-    for n, i in enumerate(todo[:limit]):
-        if progress and n % 10 == 0:
-            progress(n, min(len(todo), limit), "items for sale")
-        item_gear(api, i)
-    cache = load_json(ITEM_STATS_PATH, {})
-    pool = []
-    for i in ids:
-        g = cache.get(f"{api.game}:{i}")
-        if g and not g.get("missing") and g.get("cls_id") in (ARMOR, WEAPON) and g.get("inv"):
-            pool.append({"id": i, "name": g.get("name") or f"Item {i}", "ilvl": g.get("ilvl"), "req": g.get("req"),
-                         "sub_id": g.get("sub_id"), "q": g.get("q"), "inv": g["inv"], "preview": g,
-                         "cls_id": g["cls_id"]})
-    unknown = sum(1 for i in ids if (cache.get(f"{api.game}:{i}") or {}).get("missing"))
-    return pool, max(0, len(todo) - limit), unknown
-
-
 NON_GEAR = {"Trade Goods", "Consumable", "Recipe", "Reagent", "Quest", "Container", "Projectile",
             "Quiver", "Key", "Gem", "Miscellaneous", "Glyph", "Battle Pets"}
 
@@ -2346,7 +2401,7 @@ def fetch_items(api, ids, progress=None, workers=8):
             return i, api.get(f"/data/wow/item/{i}", "static"), None
         except ApiError as e:
             return i, None, e.code
-        except (SystemExit, Exception):
+        except Exception:                   # network trouble etc.: not cached, asked again next time
             return i, None, -1
 
     done = 0
@@ -2357,11 +2412,11 @@ def fetch_items(api, ids, progress=None, workers=8):
                 key = f"{api.game}:{i}"
                 if d is not None:
                     try:
-                        cache[key] = gear_from_item(d)
+                        cache[key] = {**gear_from_item(d), "at": int(time.time())}
                     except Exception:
-                        cache[key] = {"missing": True}
+                        cache[key] = {"missing": True, "at": int(time.time())}
                 elif code == 404:
-                    cache[key] = {"missing": True}
+                    cache[key] = {"missing": True, "at": int(time.time())}
                 if progress and (done % 20 == 0 or done == len(todo)):
                     progress(done, len(todo))
                 if done % 250 == 0:
@@ -2553,124 +2608,6 @@ def gear_score(g, weights, slot, mode=COMPARE_MODES[0]):
     return efficiency(g, weights, slot, mode)["eff"]
 
 
-def can_use(char, slot, cand, gear):
-    rules = CLASS_GEAR.get(char["cls"])
-    inv, sub = cand["inv"], cand["sub_id"]
-    if not rules:
-        return True
-    if inv in ("SHIELD",):
-        return rules["shield"] and slot == "OFF_HAND"
-    if inv == "HOLDABLE":
-        return slot == "OFF_HAND" and char["cls"] in ("Priest", "Mage", "Warlock", "Druid", "Shaman", "Paladin")
-    if slot in BODY_ARMOR_SLOTS and sub in (CLOTH, LEATHER, MAIL, PLATE):
-        low, high = rules["armor"]
-        best = high if char["level"] >= 40 else low
-        # your best armor type, plus one step down - but never cloth for leather/mail/plate wearers
-        allowed = {best} | ({best - 1} if best - 1 >= LEATHER else set())
-        return sub in allowed
-    if inv in ("WEAPON", "WEAPONMAINHAND", "WEAPONOFFHAND", "TWOHWEAPON", "RANGED", "RANGEDRIGHT", "THROWN"):
-        if sub is not None and sub not in rules["weapons"]:
-            return False
-        if slot == "OFF_HAND" and inv in ("WEAPON", "WEAPONOFFHAND"):
-            return rules["dual"]
-        if slot == "OFF_HAND":
-            return False
-        if slot == "MAIN_HAND" and inv == "WEAPONOFFHAND":
-            return False
-    return True
-
-
-def find_upgrades(api, char, focus=None, max_price=None, progress=None, per_slot=5, check=40,
-                  mode=COMPARE_MODES[0], only=None):
-    """Best AH upgrades per slot for a character. Also returns a per-slot breakdown of how many
-    items were known / for sale / usable / better, so an empty result can be explained."""
-    weights = (STAT_PRESETS.get(char["cls"], {}).get(focus)
-               or next(iter(STAT_PRESETS.get(char["cls"], {}).values()), DEFAULT_WEIGHTS))
-    sources = get_sources(api)
-    equipped = {g["slot"]: g for g in char["gear"]}
-    two_hander = (equipped.get("MAIN_HAND") or {}).get("inv") == "TWOHWEAPON"
-    slots = [s for s in SLOT_SEARCH if not (s == "OFF_HAND" and two_hander)]
-    if only:
-        slots = [s for s in slots if s in only]
-    rows, current, diag = [], {}, []
-    pool, pool_left, used_pool, unknown = None, 0, False, 0
-    for n, slot in enumerate(slots):
-        if progress:
-            progress(n, len(slots), SLOT_NAMES[slot])
-        cur = equipped.get(slot)
-        cur_e = efficiency(cur, weights, slot, mode) if cur else efficiency(None, weights, slot, mode)
-        cur_score = cur_e["eff"]
-        current[slot] = {"item": cur, "score": cur_score, **cur_e}
-        members = []
-        for item_class, inv_types in SLOT_SEARCH[slot]:
-            for inv in inv_types:
-                members.extend(slot_members(api, item_class, inv))
-        if not members:                                    # search found nothing: read the AH itself
-            if pool is None:
-                pool, pool_left, unknown = ah_gear_pool(api, sources, progress)
-                used_pool = True
-            wanted = {(c, inv) for c, invs in SLOT_SEARCH[slot] for inv in invs}
-            members = [m for m in pool if (m["cls_id"], m["inv"]) in wanted]
-        d = {"slot": SLOT_NAMES[slot], "slot_key": slot, "known": len(members), "for_sale": 0, "usable": 0,
-             "better": 0, "no_data": 0}
-        cands = []
-        seen = set()
-        for m in members:
-            if m["id"] in seen:
-                continue
-            seen.add(m["id"])
-            summ = item_summary(sources, m["id"])
-            if not summ:
-                continue
-            d["for_sale"] += 1
-            if m["req"] is not None and m["req"] > char["level"]:
-                continue
-            if m["q"] == "POOR" or (cur and m["id"] == cur.get("id")):
-                continue
-            if not can_use(char, slot, m, cur):
-                continue
-            if max_price and summ["lowest"] > max_price:
-                continue
-            d["usable"] += 1
-            cands.append((m, summ))
-        # only fetch full stats for the most promising (highest item level) candidates
-        cands.sort(key=lambda c: -(c[0]["ilvl"] or 0))
-        found = []
-        for m, summ in cands[:check]:
-            g = m.get("preview") or item_gear(api, m["id"]) or {"stats": {}, "armor": 0, "dps": 0}
-            g = {**g, "ilvl": g.get("ilvl") or m["ilvl"], "req": g.get("req") if g.get("req") is not None else m["req"],
-                 "q": g.get("q") or m["q"], "inv": g.get("inv") or m["inv"]}
-            if not g["ilvl"]:
-                d["no_data"] += 1          # Blizzard has nothing on this item - can't score it
-                continue
-            e = efficiency(g, weights, slot, mode)
-            gain = e["eff"] - cur_score
-            if gain <= 0.01:
-                continue
-            d["better"] += 1
-            found.append({"slot": slot, "slot_name": SLOT_NAMES[slot], "id": m["id"], "name": m["name"],
-                          "q": g["q"], "ilvl": g["ilvl"], "req": g["req"], "gear": g,
-                          "score": e["eff"], "eff": e["eff"], "power": e["power"], "fit": e["fit"], "est": e["est"],
-                          "gain": gain, "up_pct": (gain / cur_score * 100) if cur_score > 0.5 else None,
-                          "price": summ["lowest"], "listed": summ["quantity"],
-                          "per_gold": gain / max(summ["lowest"] / 10000, 0.01)})
-        found.sort(key=lambda r: -r["gain"])
-        rows.extend(found[:per_slot])
-        diag.append(d)
-    if progress:
-        progress(len(slots) - 1, len(slots), "done")
-    # a ring or trinket shouldn't be suggested for both slots - keep it where it helps most
-    best = {}
-    for r in rows:
-        if r["slot"][:-2] in ("FINGER", "TRINKET"):
-            k = (r["slot"][:-2], r["id"])
-            if k not in best or r["gain"] > best[k]["gain"]:
-                best[k] = r
-    rows = [r for r in rows if r["slot"][:-2] not in ("FINGER", "TRINKET") or best[(r["slot"][:-2], r["id"])] is r]
-    return {"rows": rows, "current": current, "weights": weights, "ts": api.snapshot_time,
-            "diag": diag, "used_pool": used_pool, "pool_left": pool_left, "unknown": unknown, "mode": mode}
-
-
 def load_characters():
     return load_json(CHARACTERS_PATH, [])
 
@@ -2679,8 +2616,61 @@ def remember_character(entry):
     chars = [c for c in load_characters()
              if (c.get("name", "").lower(), c.get("surname", "").lower(), c.get("realm", "").lower(), c.get("game"))
              != (entry["name"].lower(), entry.get("surname", "").lower(), entry.get("realm", "").lower(), entry["game"])]
-    chars.insert(0, entry)
+    chars.insert(0, {**entry, "at": int(time.time())})
     save_json(CHARACTERS_PATH, chars[:12])
+
+
+# ---------- the 30-day limit on Blizzard data ----------
+
+TTL_KEEP_IN_CACHE = {"token.json", "forever_quest_info.json"}   # a credential; and a file pruned entry by entry
+
+
+def _fresh(entry, cutoff, key="at"):
+    return isinstance(entry, dict) and isinstance(entry.get(key), (int, float)) and entry[key] >= cutoff
+
+
+def enforce_data_ttl(now=None):
+    """Delete everything saved from Blizzard's API that is older than DATA_TTL (Blizzard Developer API Terms
+    2.18). Records without a time stamp come from older versions and count as old. The user's own lists
+    (watchlist, alerts, fishing log, recipes, spots, guide progress, tracking list) are left alone.
+    wow_progress.enforce_data_ttl() does the same for Progress snapshots and quest text."""
+    global _info
+    cutoff = (now or time.time()) - DATA_TTL
+    removed = 0
+    for path in (ITEM_INFO_PATH, ITEM_STATS_PATH, ITEM_CACHE_PATH):
+        data = load_json(path, None)
+        if isinstance(data, dict):
+            keep = {k: v for k, v in data.items() if _fresh(v, cutoff)}
+            if len(keep) != len(data):
+                removed += len(data) - len(keep)
+                atomic_write_json(path, keep, indent=None if path == ITEM_INFO_PATH else 1)   # same format as before
+    _info = None                                        # re-read item names on next use
+    chars = load_characters()
+    if isinstance(chars, list):
+        keep = [c for c in chars if _fresh(c, cutoff)]
+        if len(keep) != len(chars):
+            removed += len(chars) - len(keep)
+            save_json(CHARACTERS_PATH, keep)
+    if os.path.exists(HISTORY_DB):
+        with closing(_db()) as con, con:
+            removed += con.execute("DELETE FROM prices WHERE ts < ?", (int(cutoff),)).rowcount
+    try:
+        names = os.listdir(CACHE_DIR)
+    except OSError:
+        names = []
+    for name in names:
+        path = os.path.join(CACHE_DIR, name)
+        if name in TTL_KEEP_IN_CACHE or not os.path.isfile(path):
+            continue                                    # the questiedb and fonts folders aren't Blizzard data
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.remove(path)
+                removed += 1
+        except OSError as e:
+            log.warning("couldn't remove old cache file %s: %s", path, e)
+    if removed:
+        log.info("removed %d Blizzard records older than %d days", removed, DATA_TTL // 86400)
+    return removed
 
 
 # ---------- CSV export ----------

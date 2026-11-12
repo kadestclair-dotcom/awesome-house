@@ -1,22 +1,33 @@
 Awesome House - License
 =======================
-Version: Beta 0.14
 Copyright (c) 2026 Kade. All rights reserved.
 
-This app is free to use. By installing or using it, you agree to these terms.
+Awesome House is SOURCE-AVAILABLE, not open source. The source code is
+published so that anyone can see exactly what the app does and confirm that
+official releases are built from it. Publishing it does not give you any
+right to reuse it beyond what is written here.
 
 YOU MAY
-  - Download, install and use the app for your own personal, non-commercial use.
-  - Use it while it is in beta, knowing that beta software can have bugs and
+  - Download, install and use the app for your own personal, non-commercial
+    use, including beta versions, knowing that beta software can have bugs and
     can change between versions.
-  - Tell other people about it and point them to the official download page:
-    github.com/kadestclair-dotcom/awesome-house/releases
+  - Read the source code and build the app yourself for your own personal use.
+  - View and fork this repository on GitHub, as GitHub's Terms of Service
+    allow for public repositories, and open issues and pull requests.
+  - Tell other people about the app and point them to the official download
+    page: github.com/kadestclair-dotcom/awesome-house/releases
 
 YOU MAY NOT, without Kade's written permission
-  - Redistribute, re-upload, mirror or share copies of the app or this package.
+  - Redistribute, re-upload, mirror or share copies of the app, its source code
+    or its release packages anywhere else.
   - Sell, rent or charge for the app, or bundle it with anything that is sold.
-  - Modify, decompile, reverse-engineer, rebrand or make derivative works of it.
+  - Publish modified versions, rebrand the app, or reuse its code in another
+    project.
   - Remove or change this notice or any copyright notice in the app.
+
+CONTRIBUTIONS
+  If you send a pull request or patch, you agree that Kade may use, change and
+  publish it as part of Awesome House under these terms.
 
 DONATIONS
   Donations are voluntary and appreciated. A donation does not buy any license,
@@ -30,17 +41,26 @@ NO WARRANTY
   account, arising from use of the app.
 
 THIRD PARTIES
-  - The app uses Blizzard's Developer API with your own API client. Your use of
-    that API is also subject to Blizzard's Developer API Terms of Use.
-  - World of Warcraft is a trademark of Blizzard Entertainment, Inc. This is a
-    fan-made tool, not affiliated with or endorsed by Blizzard.
-  - The Monster Compendium uses QuestieDB (github.com/Questie/QuestieDB), the
-    Questie addon's community database. It is not included in this package:
-    the app downloads it from GitHub on your computer when you choose to, and
-    it stays under its own authors' terms.
-  - The Pixelify Sans and VT323 fonts built into the app belong to their
-    authors and are licensed under the SIL Open Font License 1.1
-    (https://openfontlicense.org). That license covers only the fonts.
+  - The app uses Blizzard's Developer API with each user's own API client.
+    Use of that API is also subject to Blizzard's Developer API Terms of Use.
+  - Auction, item and character data comes from Blizzard Entertainment's API.
+    Awesome House is a fan-made tool, not affiliated with or endorsed by
+    Blizzard. World of Warcraft and Blizzard Entertainment are trademarks or
+    registered trademarks of Blizzard Entertainment, Inc., in the U.S. and/or
+    other countries.
+  - The Monster Compendium, Dungeons and Progress tabs use QuestieDB
+    (github.com/Questie/QuestieDB), the Questie addon's community database,
+    made by the Questie team and contributors and used with the Questie team's
+    permission. It is not part of this repository or the release packages: the
+    app downloads it from GitHub on the user's computer when the user chooses
+    to, and it stays under QuestieDB's own license:
+    https://github.com/Questie/QuestieDB/blob/master/LICENSE.md
+  - The Pixelify Sans and VT323 fonts built into the app are licensed under
+    the SIL Open Font License 1.1. See FONTS-LICENSE.txt. That license covers
+    only the fonts.
+  - The app is built with Python, OpenSSL, Tcl/Tk and other third-party
+    software, each under its own license. See THIRD-PARTY-NOTICES.txt and
+    PYTHON-LICENSE.txt in the release package.
 
 ENDING
   Your permission to use the app ends automatically if you break these terms.

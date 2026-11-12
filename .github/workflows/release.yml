@@ -50,8 +50,7 @@ jobs:
         run: >
           python -m PyInstaller --noconfirm --clean --onefile --windowed
           --name AwesomeHouse --icon ah_coin_icon.ico
-          --add-data "ah_coin_icon.ico;." --add-data "item_info.json;."
-          --add-data "item_stats.json;." --add-data "item_cache.json;."
+          --add-data "ah_coin_icon.ico;."
           --add-data "dungeon_travel.json;."
           wow_price_gui.pyw
 
@@ -62,6 +61,10 @@ jobs:
           New-Item -ItemType Directory -Force $pkg | Out-Null
           Copy-Item dist/AwesomeHouse.exe $pkg
           Copy-Item package/* $pkg
+          # Python's own LICENSE.txt holds the licenses of Python, OpenSSL, Tcl/Tk etc. built into the exe
+          $pylic = python -c "import sys, os; print(os.path.join(sys.base_prefix, 'LICENSE.txt'))"
+          if (-not (Test-Path $pylic)) { throw "Python's LICENSE.txt not found at $pylic" }
+          Copy-Item $pylic "$pkg/PYTHON-LICENSE.txt"
           Compress-Archive -Path $pkg -DestinationPath "out/${{ steps.ver.outputs.zip }}" -Force
           $sums = foreach ($f in @("out/${{ steps.ver.outputs.zip }}", "$pkg/AwesomeHouse.exe")) {
             "{0}  {1}" -f (Get-FileHash $f -Algorithm SHA256).Hash.ToLower(), (Split-Path $f -Leaf)

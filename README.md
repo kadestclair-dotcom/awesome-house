@@ -79,9 +79,11 @@ This installs PyInstaller, builds `dist\AwesomeHouse.exe`, and zips the share pa
 
 ## License and credits
 
+Privacy policy: [PRIVACY.md](PRIVACY.md). In short: everything stays on your PC, and data from Blizzard is deleted after 30 days.
+
 **Source-available, all rights reserved.** © 2026 Kade. The code is public so you can see exactly what the app does. You may use the app for free for personal, non-commercial use. Please don't redistribute, sell, rebrand or publish modified copies. Full terms are in [LICENSE](LICENSE).
 
-- Monster Compendium and Dungeons data: [QuestieDB](https://github.com/Questie/QuestieDB), the Questie addon's community database. It is downloaded separately on your computer and isn't part of this repository.
+- Monster Compendium, Dungeons and Progress data: [QuestieDB](https://github.com/Questie/QuestieDB), the Questie addon's community database by the Questie team and contributors, used with their permission. It is downloaded separately on your computer, isn't part of this repository, and stays under [QuestieDB's license](https://github.com/Questie/QuestieDB/blob/master/LICENSE.md).
 - Pixel fonts [Pixelify Sans](https://fonts.google.com/specimen/Pixelify+Sans) and [VT323](https://fonts.google.com/specimen/VT323) under the SIL Open Font License 1.1. The capital C and G and the lowercase c of Pixelify Sans were modified to be easier to read at small sizes.
 
-Awesome House is a fan-made tool, not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft is a trademark of Blizzard Entertainment, Inc.
+Auction, item and character data comes from Blizzard Entertainment's API. Awesome House is a fan-made tool, not affiliated with or endorsed by Blizzard Entertainment. World of Warcraft and Blizzard Entertainment are trademarks or registered trademarks of Blizzard Entertainment, Inc., in the U.S. and/or other countries.
