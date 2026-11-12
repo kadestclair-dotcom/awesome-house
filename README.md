@@ -7,6 +7,8 @@ A free Windows companion app that reads the World of Warcraft auction house for 
 **[⬇ Download the latest release](https://github.com/kadestclair-dotcom/awesome-house/releases)** · **[Website](https://kadestclair-dotcom.github.io/awesome-house/)** · **[Illustrated tour (PDF)](docs/about-awesome-house.pdf)**
 
 > **Beta 0.16.1.** Features are still being added and you may run into bugs. Please [report them](../../issues).
+>
+> **New in 0.16.1:** safer saves, a steadier connection to Blizzard, and Blizzard's 30-day data rule. [What changed and why](docs/update-log-0.16.1.md).
 
 ---
 
